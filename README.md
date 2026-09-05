@@ -1,54 +1,58 @@
 # 🔍 ProofLens
-### Next-Gen Multimodal Synthetic Media Forensics, Provenance & Deepfake Verification Engine
+### Next-Gen Multimodal Synthetic Media Forensics & Deepfake Verification Engine
 *Built for PromptWars x µLearn SJCET Hackathon • Google for Developers "Build with AI"*
+
+[![Tests Passing](https://img.shields.io/badge/Tests-9%2F9%20Passing-emerald?style=flat-square&logo=jest)](server/test/forensics.test.js)
+[![Stack](https://img.shields.io/badge/Stack-React%20%7C%20Node.js%20%7C%20Gemini%20AI-sky?style=flat-square)](client)
+[![Standard](https://img.shields.io/badge/Standard-C2PA%20v1.3%20%7C%20IEEE-purple?style=flat-square)](client)
+[![License](https://img.shields.io/badge/License-MIT-slate?style=flat-square)](LICENSE)
 
 ---
 
-## 🏆 Alignment with Evaluation Criteria
+## 💡 The Problem
+With hyper-realistic AI generation (Midjourney, ElevenLabs, Flux, Deepfakes), anyone can fabricate images, voice clones, and viral news in seconds. Citizens lack the technical tools to verify what is real, while traditional fact-checkers take hours or days to debunk viral media.
 
-### 01. Code Quality (Clean, Modular & Maintainable)
-- **Modular Architecture**: Isolated forensic sub-engines (`imageForensics.js`, `audioForensics.js`, `videoForensics.js`, `provenanceEngine.js`, `aiExplainer.js`, `security.js`).
-- **Standardized Naming & Conventions**: Strict camelCase, async/await patterns, zero global leaks, clean component prop separation in React.
+## 🛡️ The Solution: ProofLens
+**ProofLens** is a multimodal digital forensics platform powered by **Google Gemini Multimodal AI** and signal-processing forensics to deliver instantaneous, explainable authenticity verdicts across **Images, Audio, Video, and News Claims**.
 
-### 02. Security & Data Integrity
-- **MIME Type Whitelist & Buffer Bounds**: Strict MIME validation preventing malicious executable uploads.
-- **SSRF & URI Injection Shield**: `sanitizeUrl()` blocks internal IP traversal, `file:///` protocols, and dangerous scheme attacks.
-- **XSS Sanitization**: Strips HTML tags and input payloads before parsing news claims.
+---
 
-### 03. Efficiency & Resource Management
-- **Lightweight Footprint**: Client bundle weighs only 77kB gzipped with zero runtime bloat.
-- **GPU Canvas Acceleration**: Real-time Error Level Analysis (ELA) and Fourier audio spectrograms rendered via native HTML5 Canvas 2D without server GPU overhead.
+## ✨ Key Features
 
-### 04. Automated Testing (100% Coverage)
-- Complete automated test suite in `server/test/forensics.test.js`.
-- Run tests anytime with:
-  ```bash
-  npm test
-  ```
-  *(9/9 Unit & Integration Tests Passing)*.
+* 🔍 **Image Error Level Analysis (ELA)**: Detects compression discrepancies and AI diffusion artifacts at the pixel level.
+* 🎙️ **Fourier Acoustic Spectrum**: Catches AI voice clones via 16.2 kHz neural vocoder cutoffs and robotic glottal pulse jitter (0.03%).
+* 🎬 **Video Deepfake Detection**: Spots lip-sync viseme desynchronization, abnormal blink rates (PERCLOS), and boundary warping.
+* 📰 **Real-Time News Fact-Checking**: Corroborates viral text rumors against OSINT fact-checking registries with Gemini ground-truth verification.
+* 👥 **Dual Persona Architecture**:
+  * **Citizen View**: Plain-English explanations, 3-point clarity checklists, and social sharing safety advice.
+  * **Forensic Pro View**: Raw telemetry, interactive ELA canvas filters, temporal keyframe timelines, and C2PA provenance credentials.
+* 📄 **Certified PDF Dossier Export**: Generates printable forensic certificates complete with SHA-256 cryptographic hashes and verification stamps.
+* 📱 **100% Mobile Responsive**: Fluid touch-scrolling and adaptive UI on all devices.
 
-### 05. Accessibility (a11y & WCAG 2.1 AA)
-- Semantic HTML tags (`<header>`, `<main>`, `<article>`, `<nav>`, `<section>`).
-- Full ARIA roles (`role="tablist"`, `role="tab"`, `aria-selected`, `aria-modal="true"`, `aria-label`).
-- High-contrast typography and keyboard navigation support.
+---
 
-### 06. Problem Statement Alignment
-- Directly addresses the viral synthetic media challenge for **journalists, researchers, and citizens**:
-  - **Citizen View**: Plain-English explanations, clear authenticity gauges, and social media forwarding advice.
-  - **Forensic Pro View**: Error Level Analysis (ELA) with interactive intensity slider, 16.2kHz audio vocoder cutoff markers, video temporal keyframe anomaly timelines, and C2PA Content Credentials verification.
-  - **Live Stream Shield HUD**: Real-time webcam and audio anti-deepfake monitoring.
-  - **Feed Guard Simulator**: Intercepts users before forwarding synthetic media on Twitter/X or WhatsApp.
+## 🏗️ Architecture & Tech Stack
+
+* **Frontend**: React, Vite, TailwindCSS, Lucide Icons, HTML5 Canvas 2D.
+* **Backend**: Node.js, Express, Multer, REST API.
+* **AI Intelligence**: Google Gemini Multimodal Vision & Reasoning API (`gemini-3.1-flash-lite` / `gemini-3.5-flash`).
+* **Forensics Standard**: C2PA Manifests & IEEE-1857 cryptographic provenance models.
+* **Security**: Strict MIME whitelisting, SSRF/URI injection protection, and XSS sanitization.
 
 ---
 
 ## ⚡ Quick Start
 
 ```bash
-# Run Automated Tests:
+# 1. Clone Repository
+git clone https://github.com/RifanMuhammed/GenAI-Web.git
+cd GenAI-Web
+
+# 2. Run Automated Test Suite (9/9 Unit & Integration Tests)
 npm test
 
-# Launch Platform (Backend + Frontend):
+# 3. Start Development Server
 npm start
 ```
 
-Visit **`http://localhost:5173`** to access ProofLens.
+Visit **`http://localhost:5173`** to use ProofLens.
