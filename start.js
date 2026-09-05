@@ -14,7 +14,8 @@ const serverProcess = spawn('node', ['server/index.js'], {
 });
 
 // 2. Start Client Dev Server
-const clientProcess = spawn('npm.cmd', ['run', 'dev'], {
+const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const clientProcess = spawn(npmCmd, ['run', 'dev'], {
   cwd: path.join(__dirname, 'client'),
   stdio: 'inherit',
   shell: true

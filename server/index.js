@@ -23,9 +23,13 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Ensure upload directory exists
-const uploadsDir = path.join(__dirname, 'uploads');
+const uploadsDir = process.env.VERCEL ? path.join('/tmp', 'uploads') : path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+  try {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  } catch (e) {
+    console.warn('Upload dir creation notice:', e.message);
+  }
 }
 
 // Multer storage configuration with sanitization
@@ -230,6 +234,10 @@ app.post('/api/verify/live-frame', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`ProofLens Forensic Backend running at http://localhost:${PORT}`);
-});
+if (require.main === module || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`ProofLens Forensic Backend running at http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
