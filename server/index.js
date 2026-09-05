@@ -97,6 +97,8 @@ function cleanupOldUploads() {
     const files = fs.readdirSync(uploadsDir);
     const now = Date.now();
     for (const file of files) {
+      // Never delete .gitkeep or dotfiles
+      if (file === '.gitkeep' || file.startsWith('.')) continue;
       const filePath = path.join(uploadsDir, file);
       try {
         const stats = fs.statSync(filePath);
