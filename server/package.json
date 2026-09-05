@@ -11,9 +11,13 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "multer": "^2.3.0"
+    "jpeg-js": "^0.4.4",
+    "multer": "^2.3.0",
+    "pngjs": "^7.0.0",
+    "sharp": "^0.35.4"
   }
 }

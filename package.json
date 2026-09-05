@@ -1,16 +1,23 @@
 {
-  "name": "veritas-lens",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "prooflens",
+  "version": "2.0.0",
+  "description": "Next-Gen Multimodal Synthetic Media Forensics, Provenance & Deepfake Verification Engine",
+  "main": "start.js",
   "scripts": {
     "start": "node start.js",
+    "test": "node server/test/forensics.test.js",
     "server": "node server/index.js",
     "client": "cd client && npm.cmd run dev",
     "build": "cd client && npm.cmd run build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "deepfake-detection",
+    "synthetic-media",
+    "image-forensics",
+    "audio-phonation",
+    "c2pa-provenance"
+  ],
+  "author": "ProofLens Team",
+  "license": "MIT",
   "type": "commonjs"
 }

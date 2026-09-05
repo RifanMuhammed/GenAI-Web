@@ -2,14 +2,15 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2306B6D4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/><path d='m9 12 2 2 4-4'/></svg>" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2338BDF8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='10'/><path d='m9 12 2 2 4-4'/></svg>" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="VeritasLens AI - GenAI Multimodal Synthetic Media Detection, Explainability & Verification Intelligence Platform for Images, Audio, Video, and Viral Claims." />
-    <title>VeritasLens AI | GenAI Deepfake & Synthetic Media Verification Platform</title>
-    <!-- Modern Typography from Google Fonts -->
+    <meta name="description" content="ProofLens - Multimodal Synthetic Media Forensics, Provenance & Deepfake Verification Engine for Journalists, Researchers, and Citizens." />
+    <title>ProofLens | Media Forensics & Verification Intelligence</title>
+    
+    <!-- Modern Editorial Typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -19,16 +20,27 @@
         theme: {
           extend: {
             fontFamily: {
-              display: ['Outfit', 'sans-serif'],
-              sans: ['Plus Jakarta Sans', 'sans-serif'],
+              sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+              display: ['Space Grotesk', 'Inter', 'sans-serif'],
               mono: ['JetBrains Mono', 'monospace'],
+            },
+            colors: {
+              brand: {
+                50: '#f0f9ff',
+                100: '#e0f2fe',
+                400: '#38bdf8',
+                500: '#0ea5e9',
+                600: '#0284c7',
+                900: '#0c4a6e',
+                950: '#082f49',
+              }
             }
           }
         }
       }
     </script>
   </head>
-  <body class="bg-[#07090E] text-slate-100 antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
+  <body class="bg-[#090D16] text-slate-100 antialiased selection:bg-sky-500/20 selection:text-sky-200">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
