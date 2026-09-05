@@ -68,11 +68,41 @@ app.use((req, res, next) => {
   next();
 });
 
+// Strict Origin Whitelist & Controlled Vercel Preview Pattern Matcher
+const ALLOWED_ORIGINS = [
+  'https://gen-ai-web-45it.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001'
+];
+
+const isOriginAllowed = (origin, callback) => {
+  // Allow non-browser requests (e.g. mobile apps, curl, server-side tests)
+  if (!origin) return callback(null, true);
+
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    return callback(null, true);
+  }
+
+  // Controlled Vercel preview domain pattern matching (preventing wildcard origin: true)
+  const vercelPreviewPattern = /^https:\/\/([a-zA-Z0-9_-]+-)?gen-ai-web(-[a-zA-Z0-9_-]+)?\.vercel\.app$/;
+  const vercelUserPattern = /^https:\/\/.*-rifanmuhammed.*\.vercel\.app$/;
+  if (vercelPreviewPattern.test(origin) || vercelUserPattern.test(origin)) {
+    return callback(null, true);
+  }
+
+  return callback(new Error('CORS policy: Access denied for this origin.'), false);
+};
+
 // Middlewares
 app.use(cors({
-  origin: true,
-  methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-gemini-api-key'],
+  origin: isOriginAllowed,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false,
   maxAge: 86400
 }));
 
@@ -141,26 +171,44 @@ const upload = multer({
   }
 });
 
-// Serve static uploads
-app.use('/uploads', express.static(uploadsDir, {
-  maxAge: '1h',
-  dotfiles: 'deny',
-  setHeaders: (res) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-  }
-}));
+// Note: Static /uploads route is deliberately not mounted to prevent unauthenticated public file access.
+// Uploaded files are ephemeral and deleted immediately upon analysis completion.
 
-// Rate Limiters
+// Tiered Distributed Rate Limiters
 const generalApiLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   maxRequests: 60,
   message: 'API rate limit exceeded. Please wait a minute before making more requests.'
 });
 
-const aiAnalysisLimiter = createRateLimiter({
+const imageAnalysisLimiter = createRateLimiter({
   windowMs: 60 * 1000,
   maxRequests: 20,
-  message: 'Analysis quota rate limit exceeded. Please wait a minute before submitting further forensic jobs.'
+  message: 'Image analysis rate limit exceeded. Please wait a minute before submitting further jobs.'
+});
+
+const audioAnalysisLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxRequests: 20,
+  message: 'Audio analysis rate limit exceeded. Please wait a minute before submitting further jobs.'
+});
+
+const videoAnalysisLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxRequests: 10,
+  message: 'Video analysis rate limit exceeded. Video forensic pipelines are computationally intensive.'
+});
+
+const urlAnalysisLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxRequests: 15,
+  message: 'Remote URL analysis rate limit exceeded. Please wait a minute before submitting further requests.'
+});
+
+const claimAnalysisLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxRequests: 20,
+  message: 'Claim fact-checking rate limit exceeded. Please wait a minute before submitting further claims.'
 });
 
 const liveShieldLimiter = createRateLimiter({
@@ -226,7 +274,7 @@ function buildUnifiedReport(baseAnalysis, filename, url, buffer = null) {
     timestamp: new Date().toISOString(),
     filename: safeName,
     sourceUrl: sanitizeUrl(url),
-    mediaPreview: url ? sanitizeUrl(url) : (filename ? `/uploads/${path.basename(filename)}` : null),
+    mediaPreview: url ? sanitizeUrl(url) : null,
     sha256,
     c2paId,
     ...baseAnalysis,
@@ -238,7 +286,7 @@ function buildUnifiedReport(baseAnalysis, filename, url, buffer = null) {
 }
 
 // Image Analysis Endpoint (with magic-byte verification & Gemini Vision support)
-app.post('/api/analyze/image', aiAnalysisLimiter, upload.single('mediaFile'), async (req, res) => {
+app.post('/api/analyze/image', imageAnalysisLimiter, upload.single('mediaFile'), async (req, res) => {
   let uploadedFilePath = null;
   let fileBuffer = null;
   try {
@@ -258,10 +306,9 @@ app.post('/api/analyze/image', aiAnalysisLimiter, upload.single('mediaFile'), as
     const originalName = req.file ? sanitizeFilename(req.file.originalname) : (req.body.filename ? sanitizeFilename(req.body.filename) : '');
     const filePath = uploadedFilePath;
     const mimeType = req.file ? req.file.mimetype : 'image/jpeg';
-    const apiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
     const url = sanitizeUrl(req.body.url);
     
-    const analysis = await analyzeImage({ filename, originalName, filePath, fileBuffer, mimeType, apiKey, url });
+    const analysis = await analyzeImage({ filename, originalName, filePath, fileBuffer, mimeType, url });
     const report = buildUnifiedReport(analysis, originalName || filename, url, fileBuffer);
     
     // Clean up temporary upload file after successful analysis to prevent data leaks
@@ -275,7 +322,7 @@ app.post('/api/analyze/image', aiAnalysisLimiter, upload.single('mediaFile'), as
 });
 
 // Audio Analysis Endpoint (with magic-byte verification)
-app.post('/api/analyze/audio', aiAnalysisLimiter, upload.single('mediaFile'), (req, res) => {
+app.post('/api/analyze/audio', audioAnalysisLimiter, upload.single('mediaFile'), (req, res) => {
   let uploadedFilePath = null;
   let fileBuffer = null;
   try {
@@ -308,7 +355,7 @@ app.post('/api/analyze/audio', aiAnalysisLimiter, upload.single('mediaFile'), (r
 });
 
 // Video Analysis Endpoint (with magic-byte verification & Gemini Multimodal Video support)
-app.post('/api/analyze/video', aiAnalysisLimiter, upload.single('mediaFile'), async (req, res) => {
+app.post('/api/analyze/video', videoAnalysisLimiter, upload.single('mediaFile'), async (req, res) => {
   let uploadedFilePath = null;
   let fileBuffer = null;
   try {
@@ -328,10 +375,9 @@ app.post('/api/analyze/video', aiAnalysisLimiter, upload.single('mediaFile'), as
     const originalName = req.file ? sanitizeFilename(req.file.originalname) : (req.body.filename ? sanitizeFilename(req.body.filename) : '');
     const filePath = uploadedFilePath;
     const mimeType = req.file ? req.file.mimetype : 'video/mp4';
-    const apiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
     const url = sanitizeUrl(req.body.url);
 
-    const analysis = await analyzeVideo({ filename, originalName, filePath, fileBuffer, mimeType, apiKey, url });
+    const analysis = await analyzeVideo({ filename, originalName, filePath, fileBuffer, mimeType, url });
     const report = buildUnifiedReport(analysis, originalName || filename, url, fileBuffer);
     
     safeUnlink(uploadedFilePath);
@@ -344,7 +390,7 @@ app.post('/api/analyze/video', aiAnalysisLimiter, upload.single('mediaFile'), as
 });
 
 // SSRF-Protected Remote Media & URL Verifier
-app.post('/api/analyze/url', aiAnalysisLimiter, async (req, res) => {
+app.post('/api/analyze/url', urlAnalysisLimiter, async (req, res) => {
   try {
     const rawUrl = req.body.url;
     if (!rawUrl || typeof rawUrl !== 'string') {
@@ -361,15 +407,14 @@ app.post('/api/analyze/url', aiAnalysisLimiter, async (req, res) => {
 
     const { buffer, mimeType, finalUrl } = fetched;
     const type = req.body.type || (mimeType.startsWith('video') ? 'video' : mimeType.startsWith('audio') ? 'audio' : 'image');
-    const apiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
 
     let analysis;
     if (type === 'audio' || mimeType.startsWith('audio')) {
       analysis = analyzeAudio({ fileBuffer: buffer, url: finalUrl });
     } else if (type === 'video' || mimeType.startsWith('video')) {
-      analysis = await analyzeVideo({ fileBuffer: buffer, mimeType, apiKey, url: finalUrl });
+      analysis = await analyzeVideo({ fileBuffer: buffer, mimeType, url: finalUrl });
     } else {
-      analysis = await analyzeImage({ fileBuffer: buffer, mimeType, apiKey, url: finalUrl });
+      analysis = await analyzeImage({ fileBuffer: buffer, mimeType, url: finalUrl });
     }
 
     const report = buildUnifiedReport(analysis, null, finalUrl, buffer);
@@ -381,7 +426,7 @@ app.post('/api/analyze/url', aiAnalysisLimiter, async (req, res) => {
 });
 
 // Viral News Claim / Text Verification with Gemini AI Fact-Checking Engine
-app.post('/api/analyze/claim', aiAnalysisLimiter, async (req, res) => {
+app.post('/api/analyze/claim', claimAnalysisLimiter, async (req, res) => {
   try {
     const rawClaim = req.body.claimText;
     const claimText = sanitizeClaimText(rawClaim);
@@ -389,8 +434,7 @@ app.post('/api/analyze/claim', aiAnalysisLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Claim text is required and must not be empty.' });
     }
 
-    const apiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
-    const report = await verifyClaim({ claimText, apiKey });
+    const report = await verifyClaim({ claimText });
     res.json(report);
   } catch (err) {
     const masked = maskError(err, 'Claim Verification Route');

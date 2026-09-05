@@ -8,12 +8,12 @@
 <div align="center">
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel%20Deployment-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://gen-ai-web-45it.vercel.app/)
-[![Tests](https://img.shields.io/badge/Security%20Tests-14%2F14%20Passing%20(100%25)-emerald?style=for-the-badge&logo=jest&logoColor=white)](server/test/forensics.test.js)
+[![Tests](https://img.shields.io/badge/Security%20Tests-17%2F17%20Passing%20(100%25)-emerald?style=for-the-badge&logo=jest&logoColor=white)](server/test/forensics.test.js)
 [![AI Engine](https://img.shields.io/badge/AI%20Engine-Google%20Gemini%20Multimodal-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
 [![Security](https://img.shields.io/badge/Security-Enterprise%20SSRF%20%26%20Magic--Bytes-purple?style=for-the-badge&logo=auth0&logoColor=white)](server/security.js)
 [![Standard](https://img.shields.io/badge/Standard-C2PA%20v1.3%20%7C%20IEEE--1857-orange?style=for-the-badge)](https://c2pa.org/)
 
-**[🌐 Experience Live Demo](https://gen-ai-web-45it.vercel.app/)** • **[📊 Test Suite](#-automated-testing)** • **[🛡️ Security Architecture](#️-enterprise-security--integrity-architecture)** • **[⚡ Quick Start](#-quick-start)**
+**[🌐 Experience Live Demo](https://gen-ai-web-45it.vercel.app/)** • **[📊 Test Suite](#-automated-testing)** • **[🛡️ Security Architecture](#️-enterprise-security--integrity-architecture)** • **[⚡ Quick Start](#-quick-start--local-setup)**
 
 </div>
 
@@ -32,6 +32,7 @@
 - [Quick Start & Local Setup](#-quick-start--local-setup)
 - [Automated Testing](#-automated-testing)
 - [Deployment](#-deployment)
+- [Standards & Compliance](#-standards--compliance)
 - [License](#-license)
 
 ---
@@ -48,7 +49,7 @@ In an era of hyper-realistic generative models (**Midjourney v6, Flux, ElevenLab
 
 ## 🛡️ The Solution: ProofLens
 
-**ProofLens** bridges the gap between deep forensic science and plain-language public understanding. Powered by **Google Gemini Multimodal AI** (`gemini-3.1-flash-lite` / `gemini-3.5-flash`) and mathematical signal-processing heuristics, ProofLens delivers instantaneous, explainable authenticity verdicts across **Images, Audio, Video, and News Claims**.
+**ProofLens** bridges the gap between deep forensic science and plain-language public understanding. Powered by **Google Gemini Multimodal AI** (`gemini-3.1-flash-lite`, `gemini-3.5-flash`) and mathematical signal-processing heuristics, ProofLens delivers instantaneous, explainable authenticity verdicts across **Images, Audio, Video, and News Claims**.
 
 ```
    ┌─────────────────────────────────────────────────────────────┐
@@ -85,7 +86,8 @@ In an era of hyper-realistic generative models (**Midjourney v6, Flux, ElevenLab
 
 ### 📰 4. Viral News & Claim Verification Engine
 - **OSINT Ground-Truth Fact-Checking**: Corroborates viral headlines with indexed archives and accredited wires.
-- **Zero Hallucination Guard**: Never invents fake fact-checker claims; displays honest verified sources or uncataloged labels.
+- **Accredited Domain Allowlist**: Validates against recognized institutions (Reuters, AP, BBC, Snopes, AFP, WHO, FactCheck.org) and eliminates AI-hallucinated citations.
+- **Zero Hallucination Guard**: Never fabricates third-party verdicts; uncataloged media displays honest *"No verified fact-check source found in public registries."*
 
 ### 🛡️ 5. Live Camera & Audio Shield
 - **Real-Time Stream Verification**: Evaluates live webcam facial landmarks, motion jitter, and optical continuity to prevent biometric spoofing.
@@ -117,8 +119,9 @@ ProofLens was engineered with strict **zero-trust** security principles:
                                         │
            ┌────────────────────────────▼────────────────────────────┐
            │ 1. Security Headers (CSP, HSTS, X-Frame-Options: DENY)   │
-           │ 2. Parameter Pollution (HPP) Guard                      │
-           │ 3. Sliding-Window Rate Limiter (60/min API, 20/min AI)  │
+           │ 2. Strict Origin CORS (Allowlist & Vercel Preview Regex)│
+           │ 3. Client IP Resolver (getTrustedClientIp Header Guard) │
+           │ 4. Distributed Rate Limiter (Upstash Redis + In-Memory) │
            └────────────────────────────┬────────────────────────────┘
                                         │
                  ┌──────────────────────┴──────────────────────┐
@@ -135,10 +138,11 @@ ProofLens was engineered with strict **zero-trust** security principles:
                  └──────────────────────┬──────────────────────┘
                                         │
            ┌────────────────────────────▼────────────────────────────┐
-           │ 4. Prompt-Injection Boundary Tags (<untrusted_claim>)   │
-           │ 5. Google Gemini Multimodal Reasoning Engine            │
-           │ 6. Cryptographic SHA-256 Digesting & C2PA ID Generation │
-           │ 7. Masked Error Handler with Server Correlation UUIDs   │
+           │ 5. Prompt-Injection Boundary Tags (<untrusted_claim>)   │
+           │ 6. Server-Side GEMINI_API_KEY (Zero Client Key Passing) │
+           │ 7. Accredited Fact-Check Domain Whitelist Validator     │
+           │ 8. Cryptographic SHA-256 Digesting & C2PA ID Generation │
+           │ 9. Masked Error Handler with Server Correlation UUIDs   │
            └────────────────────────────┬────────────────────────────┘
                                         │
                           ┌─────────────▼────────────┐
@@ -146,12 +150,14 @@ ProofLens was engineered with strict **zero-trust** security principles:
                           └──────────────────────────┘
 ```
 
+- **Server-Only API Keys**: Gemini API keys are strictly sourced from `process.env.GEMINI_API_KEY`. No client headers (`x-gemini-api-key`), query parameters, or client bundles have access to API keys.
+- **Strict CORS Policy**: Production frontend (`https://gen-ai-web-45it.vercel.app`), local development ports, and authorized Vercel preview environments are explicitly allowlisted. Wildcard `origin: true` is disabled.
+- **Distributed Rate Limiting & Spoofing Defense**: Integrates Upstash Redis REST pipeline rate limiting for multi-instance Vercel serverless scale with sliding-window in-memory fallback. `getTrustedClientIp()` guards against spoofed `X-Forwarded-For` headers.
 - **SSRF Shield & IP Filtering**: Blocks all private IPv4/IPv6 CIDRs (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), Carrier-Grade NAT (`100.64.0.0/10`), Link-Local / Cloud Metadata (`169.254.169.254`), Loopback (`127.0.0.1`, `::1`), and obfuscated decimal/hexadecimal IP representations.
 - **Deep Magic-Byte Binary Verification**: Inspects raw binary header signatures for all media types (JPEG, PNG, WebP, GIF, MP3, WAV, OGG, MP4, WebM) to neutralize spoofed MIME types and disguised executables.
-- **AI Prompt-Injection Defense**: Delimits untrusted inputs inside `<untrusted_claim>` and `<untrusted_metadata>` tags with strict system instructions prohibiting role overrides.
-- **Sliding-Window Rate Limiting**: Multi-tiered rate limiters prevent API flooding and protect Gemini API quotas.
-- **Ephemeral Storage**: Uploads are renamed with 128-bit cryptographic random IDs, deleted immediately after analysis, and swept by an automated 10-minute garbage collector.
-- **Production HTTP Headers**: Enforces strict Content-Security-Policy (CSP), COOP, CORP, HSTS, `X-Content-Type-Options: nosniff`, and `Cache-Control: no-store` on all API routes.
+- **Fact-Check Source Integrity**: Checks fact-checking sources against verified domains (`reuters.com`, `apnews.com`, `snopes.com`, `bbc.com`, `afp.com`, `who.int`, `factcheck.org`) and filters out AI hallucinations or unverified links.
+- **Ephemeral Storage & Privacy**: Uploads are renamed with 128-bit cryptographic random IDs, deleted immediately after analysis, and swept by an automated garbage collector. Public static `/uploads` serving is disabled.
+- **Production HTTP Headers & Cache Control**: Enforces `Cache-Control: no-store` on all API routes along with Content-Security-Policy (CSP), COOP, CORP, HSTS, `X-Content-Type-Options: nosniff`, and `X-Frame-Options: DENY`.
 
 ---
 
@@ -163,7 +169,7 @@ ProofLens was engineered with strict **zero-trust** security principles:
 | **Backend Server** | Node.js, Express, Multer (Streaming Multi-Part) |
 | **AI / Intelligence** | Google Gemini Multimodal Vision & Reasoning API (`gemini-3.1-flash-lite`, `gemini-3.5-flash`) |
 | **Forensic Standards** | C2PA v1.3 Manifest Specifications, IEEE-1857 Cryptographic Lineage |
-| **Security Suite** | Custom SSRF IP Parser, Binary Magic-Byte Detector, In-Memory Rate Limiter, Crypto SHA-256 |
+| **Security Suite** | Custom SSRF IP Parser, Binary Magic-Byte Detector, Upstash Redis Rate Limiter, Crypto SHA-256 |
 | **Cloud Deployment** | Vercel Serverless Functions + Edge CDN |
 
 ---
@@ -197,15 +203,15 @@ veritas-lens/
 │   ├── engines/
 │   │   ├── aiExplainer.js              # Plain-English & Pro explainability
 │   │   ├── audioForensics.js           # Phonation & 16.2kHz vocoder detector
-│   │   ├── claimVerifier.js            # Gemini fact-checking engine
+│   │   ├── claimVerifier.js            # Gemini fact-checking engine & validator
 │   │   ├── imageForensics.js           # Gemini Vision & ELA pixel engine
 │   │   ├── provenanceEngine.js         # OSINT citation corroborator
 │   │   └── videoForensics.js           # Temporal coherence & lip-sync engine
 │   ├── test/
-│   │   └── forensics.test.js           # 14/14 Automated security & unit test suite
-│   ├── index.js                        # Express API & security middleware
+│   │   └── forensics.test.js           # 17/17 Automated security & unit test suite
+│   ├── index.js                        # Express API, CORS, & security middleware
 │   ├── sampleCases.js                  # Real-world benchmark cases (SRK, Pope, etc.)
-│   ├── security.js                     # SSRF shield, magic-bytes, rate limiter
+│   ├── security.js                     # SSRF shield, magic-bytes, Upstash rate limiter
 │   └── package.json                    # Backend dependencies
 ├── .env.example                        # Template environment variables
 ├── .gitignore                          # Git ignore rules for keys and uploads
@@ -243,6 +249,10 @@ Create a `.env` file in the `server/` directory:
 # In server/.env
 PORT=3001
 GEMINI_API_KEY=your_actual_gemini_api_key_here
+
+# Optional: Upstash Redis for distributed rate limiting in serverless
+UPSTASH_REDIS_REST_URL=https://your-upstash-instance.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your_upstash_bearer_token
 ```
 
 ### 4. Run the Automated Security & Forensic Test Suite
@@ -262,7 +272,7 @@ Visit **`http://localhost:5173`** in your browser to start analyzing media.
 
 ## 🧪 Automated Testing
 
-ProofLens includes an automated test suite verifying all forensic engines, SSRF protections, magic-byte checks, rate limiters, and provenance integrity:
+ProofLens includes an automated test suite verifying all forensic engines, SSRF protections, magic-byte checks, distributed rate limiters, client IP resolution, CORS allowlists, and fact-checking integrity:
 
 ```bash
 $ node server/test/forensics.test.js
@@ -284,10 +294,13 @@ $ node server/test/forensics.test.js
   ✔ PASS Input Sanitization: Strips XSS payloads and directory traversal sequences
   ✔ PASS Error Masking: Returns safe correlation IDs without revealing stack traces
   ✔ PASS Rate Limiting: Middleware enforces sliding-window threshold
-  ✔ PASS Provenance Integrity: Benchmark cases retain citations, user uploads are honest
+  ✔ PASS CORS Policy: Rejects unauthorized origins while allowing verified domains
+  ✔ PASS Client IP Resolution: getTrustedClientIp prioritizes platform trusted headers
+  ✔ PASS Fact-Checking Integrity: validateFactCheckSource filters unaccredited domains & SSRF URLs
+  ✔ PASS Claim Verifier: Handles extremely long text and malicious injections gracefully
 
 ------------------------------------------------------------
-  📊 Test Summary: 14/14 Passed (100%)
+  📊 Test Summary: 17/17 Passed (100%)
 ============================================================
 ```
 
@@ -300,7 +313,9 @@ The project is pre-configured for instant zero-configuration deployment to **Ver
 1. Push your repository to GitHub.
 2. Import the project into **Vercel**.
 3. Under **Project Settings** → **Environment Variables**, add:
-   - `GEMINI_API_KEY`: Your Google Gemini API Key.
+   - `GEMINI_API_KEY`: Your Google Gemini API Key *(Server-Only)*.
+   - *(Optional)* `UPSTASH_REDIS_REST_URL`: Upstash Redis REST endpoint.
+   - *(Optional)* `UPSTASH_REDIS_REST_TOKEN`: Upstash Redis Bearer token.
 4. Deploy! Vercel will automatically build the client bundle and expose serverless backend endpoints via `/api/*`.
 
 ---
