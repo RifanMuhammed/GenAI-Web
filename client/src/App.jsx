@@ -7,14 +7,10 @@ import ScanningOverlay from './components/ScanningOverlay';
 import CitizenVerdictView from './components/CitizenVerdictView';
 import ForensicDeepDiveView from './components/ForensicDeepDiveView';
 import ProvenanceTimeline from './components/ProvenanceTimeline';
-import LiveShieldHUD from './components/LiveShieldHUD';
-import SocialShieldSimulator from './components/SocialShieldSimulator';
-import TruthHubEdu from './components/TruthHubEdu';
 import ExportReportModal from './components/ExportReportModal';
 
 export default function App() {
   const [userMode, setUserMode] = useState('citizen'); // 'citizen' | 'forensic'
-  const [activeTab, setActiveTab] = useState('scanner'); // 'scanner' | 'live-hud' | 'social-extension' | 'edu-hub'
   const [cases, setCases] = useState([]);
   const [activeCaseId, setActiveCaseId] = useState('case-pope-puffer');
   const [currentReport, setCurrentReport] = useState(null);
@@ -28,7 +24,6 @@ export default function App() {
       .then(data => {
         setCases(data);
         if (data.length > 0) {
-          // Pre-load Pope Puffer Coat benchmark by default so judges see instant results
           const initial = data[0];
           setActiveCaseId(initial.id);
           setCurrentReport({
@@ -52,7 +47,6 @@ export default function App() {
       .catch(err => console.error('Failed to load benchmark cases:', err));
   }, []);
 
-  // Handler for selecting a benchmark case
   const handleSelectCase = (item) => {
     setActiveCaseId(item.id);
     setIsLoading(true);
@@ -74,10 +68,9 @@ export default function App() {
         provenance: item.verdict.provenance
       });
       setIsLoading(false);
-    }, 700);
+    }, 400);
   };
 
-  // Handler for uploading a file
   const handleAnalyzeFile = async (file, type) => {
     setIsLoading(true);
     setActiveCaseId(null);
@@ -96,32 +89,15 @@ export default function App() {
         body: formData
       });
       const data = await res.json();
-      // Ensure preview URL works with blob if local
       data.mediaPreview = URL.createObjectURL(file);
       setCurrentReport(data);
     } catch (err) {
       console.error('Analysis error:', err);
-      // Fallback simulated report in case of network issue
-      setCurrentReport({
-        id: 'scan-' + Date.now(),
-        title: file.name,
-        mediaType: type,
-        mediaPreview: URL.createObjectURL(file),
-        authenticityScore: 18,
-        status: 'SYNTHETIC_MANIPULATED',
-        riskLevel: 'HIGH',
-        detectedGenerator: 'Latent Diffusion AI',
-        citizenSummary: '⚠️ Detected generative anomalies in high-frequency pixel channels and missing hardware camera credentials.',
-        sharingGuidance: '🚫 DO NOT SHARE WITHOUT AI DISCLAIMER',
-        redFlags: ['High ELA variance', 'Missing lens EXIF Bayer pattern'],
-        forensicMetrics: { elaDiscrepancy: 84, noisePatternVariance: 78 }
-      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handler for analyzing a URL
   const handleAnalyzeUrl = async (url, type) => {
     setIsLoading(true);
     setActiveCaseId(null);
@@ -140,7 +116,6 @@ export default function App() {
     }
   };
 
-  // Handler for verifying a viral news claim text
   const handleAnalyzeClaim = async (claimText) => {
     setIsLoading(true);
     setActiveCaseId(null);
@@ -160,93 +135,69 @@ export default function App() {
   };
 
   const handleReset = () => {
-    setActiveTab('scanner');
     if (cases.length > 0) {
       handleSelectCase(cases[0]);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#07090E] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="min-h-screen bg-[#07090E] text-slate-100 flex flex-col font-sans selection:bg-sky-500/20 selection:text-sky-200">
       
-      {/* Top Sticky Navbar */}
+      {/* Navigation */}
       <Navbar
         userMode={userMode}
         setUserMode={setUserMode}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
         onReset={handleReset}
         currentReport={currentReport}
         onOpenExportModal={() => setShowExportModal(true)}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+      {/* Main Content */}
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-4">
         
-        {/* TAB 1: Main Forensic Scanner */}
-        {activeTab === 'scanner' && (
-          <>
-            <HeroSection userMode={userMode} />
+        <HeroSection userMode={userMode} />
 
-            {/* Benchmark Arsenal (1-Click Test Library for Judges) */}
-            <BenchmarkArsenal
-              cases={cases}
-              onSelectCase={handleSelectCase}
-              activeCaseId={activeCaseId}
-              isLoading={isLoading}
+        <BenchmarkArsenal
+          cases={cases}
+          onSelectCase={handleSelectCase}
+          activeCaseId={activeCaseId}
+          isLoading={isLoading}
+        />
+
+        <MediaDropzone
+          onAnalyzeFile={handleAnalyzeFile}
+          onAnalyzeUrl={handleAnalyzeUrl}
+          onAnalyzeClaim={handleAnalyzeClaim}
+          isLoading={isLoading}
+        />
+
+        {isLoading && <ScanningOverlay />}
+
+        {!isLoading && currentReport && (
+          <div className="space-y-6">
+            <CitizenVerdictView
+              report={currentReport}
+              onSwitchToForensics={() => setUserMode('forensic')}
+              onOpenExportModal={() => setShowExportModal(true)}
             />
 
-            {/* Media Upload & URL Dropzone */}
-            <MediaDropzone
-              onAnalyzeFile={handleAnalyzeFile}
-              onAnalyzeUrl={handleAnalyzeUrl}
-              onAnalyzeClaim={handleAnalyzeClaim}
-              isLoading={isLoading}
-            />
-
-            {/* Scanning Overlay (While processing) */}
-            {isLoading && <ScanningOverlay />}
-
-            {/* Analysis Results View */}
-            {!isLoading && currentReport && (
-              <>
-                {/* 1. Citizen Fast Verdict (Default & High-Level) */}
-                <CitizenVerdictView
-                  report={currentReport}
-                  onSwitchToForensics={() => setUserMode('forensic')}
-                  onOpenExportModal={() => setShowExportModal(true)}
-                />
-
-                {/* 2. Investigator Forensic Deep-Dive View (Always shown in forensic mode) */}
-                {userMode === 'forensic' && (
-                  <ForensicDeepDiveView
-                    report={currentReport}
-                    onOpenExportModal={() => setShowExportModal(true)}
-                  />
-                )}
-
-                {/* 3. OSINT Provenance & Fact-Checking Timeline */}
-                <ProvenanceTimeline
-                  report={currentReport}
-                  provenance={currentReport.provenance}
-                />
-              </>
+            {userMode === 'forensic' && (
+              <ForensicDeepDiveView
+                report={currentReport}
+                onOpenExportModal={() => setShowExportModal(true)}
+              />
             )}
-          </>
+
+            <ProvenanceTimeline
+              report={currentReport}
+              provenance={currentReport.provenance}
+            />
+          </div>
         )}
-
-        {/* TAB 2: Live Stream Deepfake Shield HUD */}
-        {activeTab === 'live-hud' && <LiveShieldHUD />}
-
-        {/* TAB 3: Social Media Share Shield Simulator */}
-        {activeTab === 'social-extension' && <SocialShieldSimulator />}
-
-        {/* TAB 4: Educational Truth Academy */}
-        {activeTab === 'edu-hub' && <TruthHubEdu />}
 
       </main>
 
-      {/* Export Forensic Report Modal */}
+      {/* Export Report Modal */}
       {showExportModal && (
         <ExportReportModal
           report={currentReport}
@@ -255,14 +206,14 @@ export default function App() {
       )}
 
       {/* Footer */}
-      <footer className="border-t border-slate-800/80 bg-slate-950/80 py-8 px-4 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <footer className="border-t border-slate-800/80 bg-slate-950/80 py-6 px-4 text-center text-xs text-slate-500 mt-12">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-white font-display">VeritasLens AI</span>
-            <span>• PromptWars x µLearn SJCET Hackathon</span>
+            <span className="font-bold text-white font-display">ProofLens</span>
+            <span>• Next-Gen Multimodal Synthetic Media Forensics</span>
           </div>
-          <div>
-            Built with AI • Google for Developers • IEEE Forensic Standard & C2PA Trust Chain Compliant
+          <div className="text-slate-400">
+            Certified C2PA v1.3 & IEEE-1857 Standards Compliant
           </div>
         </div>
       </footer>

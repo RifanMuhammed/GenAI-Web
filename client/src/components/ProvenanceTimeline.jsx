@@ -1,5 +1,5 @@
 import React from 'react';
-import { Compass, ExternalLink, Globe, Calendar, CheckCircle2, AlertOctagon, History } from 'lucide-react';
+import { Compass, ExternalLink, Globe, Calendar } from 'lucide-react';
 
 export default function ProvenanceTimeline({ provenance, report }) {
   if (!provenance && !report?.provenance) return null;
@@ -7,78 +7,73 @@ export default function ProvenanceTimeline({ provenance, report }) {
   const isSynthetic = (report?.authenticityScore || 50) < 45;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 mb-16 animate-fadeIn">
-      <div className="glass-panel p-6 sm:p-8 rounded-3xl border-slate-800 shadow-2xl">
+    <section className="max-w-4xl mx-auto px-4 mb-12 animate-fadeIn" aria-labelledby="provenance-heading">
+      <div className="glass-panel p-6 sm:p-8 rounded-3xl border-slate-800 bg-slate-900/60 shadow-xl">
         
         {/* Header */}
         <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-800">
-          <div className="p-2 rounded-xl bg-cyan-500/20 text-cyan-400">
-            <Compass className="w-6 h-6" />
+          <div className="p-2 rounded-xl bg-slate-800 text-sky-400">
+            <Compass className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-white font-display">
+            <h3 id="provenance-heading" className="text-lg sm:text-xl font-bold text-white font-display">
               OSINT Provenance & Fact-Check Verification
             </h3>
-            <p className="text-xs text-slate-400">
-              Cross-referencing reverse image registries, historical sightings & global fact-checking bureaus
+            <p className="text-xs text-slate-400 mt-0.5">
+              Corroboration against reverse search sightings & accredited global fact-checking registries
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
-          {/* Left: Origin & Reverse Match Stats */}
-          <div className="lg:col-span-4 space-y-4">
-            <div className="bg-slate-900/90 rounded-2xl p-4 border border-slate-800">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                Reverse Image Web Sightings
+          {/* Left: Origin Stats */}
+          <div className="lg:col-span-4 space-y-3">
+            <div className="bg-slate-950 rounded-2xl p-4 border border-slate-800">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                Reverse Search Matches
               </span>
-              <div className="text-3xl font-black text-cyan-400 font-display">
-                {data.reverseMatches?.toLocaleString() || 1240} <span className="text-sm font-normal text-slate-400">instances</span>
+              <div className="text-2xl font-bold text-sky-400 font-display">
+                {data.reverseMatches?.toLocaleString() || 1240} <span className="text-xs font-normal text-slate-500">sightings</span>
               </div>
-              <p className="text-xs text-slate-400 mt-2">
-                {isSynthetic 
-                  ? 'Massive viral spread across unverified social channels and bot clusters.' 
-                  : 'Matches authorized press wire distribution archives.'}
-              </p>
             </div>
 
-            <div className="bg-slate-900/90 rounded-2xl p-4 border border-slate-800">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                Earliest Documented Timestamp
+            <div className="bg-slate-950 rounded-2xl p-4 border border-slate-800">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                First Appearance
               </span>
-              <div className="flex items-center gap-2 text-sm font-bold text-slate-200 mt-1">
-                <Calendar className="w-4 h-4 text-cyan-400" />
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-300 mt-1">
+                <Calendar className="w-3.5 h-3.5 text-sky-400" />
                 <span>{data.firstSeen || data.earliestAppearance || 'March 24, 2023'}</span>
               </div>
             </div>
           </div>
 
-          {/* Right: Accredited Fact-Checking Sources & Verdicts */}
-          <div className="lg:col-span-8 space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-              <Globe className="w-4 h-4 text-cyan-400" />
-              <span>Accredited Fact-Checker Corroboration:</span>
-            </h4>
+          {/* Right: Accredited Sources */}
+          <div className="lg:col-span-8 space-y-2.5">
+            <div className="text-xs font-semibold text-slate-400 mb-1 flex items-center gap-1.5">
+              <Globe className="w-3.5 h-3.5 text-sky-400" />
+              <span>Accredited Fact-Checker Status:</span>
+            </div>
 
             {data.factCheckSources && data.factCheckSources.map((src, idx) => (
               <div
                 key={idx}
-                className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-700 transition-colors"
+                className="p-3.5 rounded-xl bg-slate-950 border border-slate-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
               >
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-white">{src.name}</span>
-                    <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                    <span className="font-bold text-white">{src.name}</span>
+                    <span className={`text-[9px] font-bold uppercase px-2 py-0.2 rounded-full ${
                       src.status.includes('SYNTHETIC') || src.status.includes('DEBUNKED') || src.status.includes('FALSE') || src.status.includes('FABRICATED')
-                        ? 'bg-red-500/20 text-red-300 border border-red-500/40'
-                        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                        ? 'bg-red-500/15 text-red-300 border border-red-500/30'
+                        : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                     }`}>
                       {src.status}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 max-w-lg">
-                    {src.claim || 'Forensic analysis confirms synthetic generative artifacts with zero optical camera provenance.'}
+                  <p className="text-slate-400 text-[11px] max-w-md">
+                    {src.claim || 'Forensic lab corroboration confirms synthetic generation signatures.'}
                   </p>
                 </div>
 
@@ -87,9 +82,9 @@ export default function ProvenanceTimeline({ provenance, report }) {
                     href={src.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 font-semibold self-start sm:self-center"
+                    className="inline-flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300 font-semibold self-start sm:self-center"
                   >
-                    <span>Read Investigation</span>
+                    <span>Read Report</span>
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 )}
@@ -100,6 +95,6 @@ export default function ProvenanceTimeline({ provenance, report }) {
         </div>
 
       </div>
-    </div>
+    </section>
   );
 }
