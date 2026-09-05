@@ -1,0 +1,16 @@
+{
+  "name": "veritas-lens",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node start.js",
+    "server": "node server/index.js",
+    "client": "cd client && npm.cmd run dev",
+    "build": "cd client && npm.cmd run build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
