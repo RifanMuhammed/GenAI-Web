@@ -9,6 +9,7 @@ const sampleCases = require('./sampleCases');
 const { analyzeImage } = require('./engines/imageForensics');
 const { analyzeAudio } = require('./engines/audioForensics');
 const { analyzeVideo } = require('./engines/videoForensics');
+const { verifyClaim } = require('./engines/claimVerifier');
 const { lookupProvenance } = require('./engines/provenanceEngine');
 const { generateExplanation } = require('./engines/aiExplainer');
 const { validateUpload, sanitizeUrl, sanitizeClaimText, MAX_FILE_SIZE_BYTES } = require('./security');
@@ -195,38 +196,15 @@ app.post('/api/analyze/url', async (req, res) => {
   }
 });
 
-// Viral News Claim / Text Verification
-app.post('/api/analyze/claim', (req, res) => {
+// Viral News Claim / Text Verification with Gemini AI Fact-Checking Engine
+app.post('/api/analyze/claim', async (req, res) => {
   try {
     const rawClaim = req.body.claimText;
     const claimText = sanitizeClaimText(rawClaim);
     if (!claimText) return res.status(400).json({ error: 'Claim text is required.' });
 
-    const isSuspicious = /(explosion|pope|balenciaga|breaking|wire transfer|resigns|alien|leak)/i.test(claimText);
-    const authenticityScore = isSuspicious ? 16 : 82;
-    const isSynthetic = authenticityScore < 45;
-
-    const report = {
-      id: 'claim-' + Date.now().toString(36),
-      timestamp: new Date().toISOString(),
-      claimText,
-      mediaType: 'text_claim',
-      authenticityScore,
-      status: isSynthetic ? 'FABRICATED_UNSUBSTANTIATED' : 'CORROBORATED_FACT',
-      riskLevel: isSynthetic ? 'HIGH' : 'LOW',
-      detectedGenerator: isSynthetic ? 'Synthetic Social Disinformation Pipeline' : 'Verified News Organization Wire',
-      citizenSummary: isSynthetic
-        ? '⚠️ This viral claim lacks official corroboration from accredited news agencies and exhibits patterns typical of synthetic disinformation campaigns.'
-        : '✅ This claim is consistent with accredited news reporting and verified public records.',
-      sharingGuidance: isSynthetic ? '🚫 DO NOT REPOST: Unverified or fabricated claim.' : '✅ SAFE TO CITE: Corroborated with primary sources.',
-      provenance: lookupProvenance({ title: claimText, type: 'claim', authenticityScore }),
-      redFlags: isSynthetic ? [
-        'Zero citations from accredited primary news services.',
-        'Sensationalist emotional engagement hooks.',
-        'Synchronized bot amplification signatures identified in viral spread.'
-      ] : []
-    };
-
+    const apiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
+    const report = await verifyClaim({ claimText, apiKey });
     res.json(report);
   } catch (err) {
     console.error('Claim verification error:', err);

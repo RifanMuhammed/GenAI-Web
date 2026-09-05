@@ -186,107 +186,160 @@ export default function ForensicDeepDiveView({ report, onOpenExportModal }) {
 
         {/* TAB 1: Visual ELA */}
         {activeTab === 'visual-ela' && (
-          <div className="pt-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-7">
-              <div className="bg-slate-950 rounded-2xl p-2 border border-slate-800 relative flex items-center justify-center min-h-[300px]">
-                {filterMode === 'original' ? (
-                  <img src={report.mediaPreview} alt="Original" className="max-h-[300px] w-auto object-contain rounded-lg" />
-                ) : (
-                  <canvas ref={canvasRef} className="max-h-[300px] w-auto object-contain rounded-lg" />
-                )}
+          <div className="pt-6 space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-7">
+                <div className="bg-slate-950 rounded-2xl p-2 border border-slate-800 relative flex items-center justify-center min-h-[300px]">
+                  {filterMode === 'original' ? (
+                    <img src={report.mediaPreview} alt="Original" className="max-h-[300px] w-auto object-contain rounded-lg" />
+                  ) : (
+                    <canvas ref={canvasRef} className="max-h-[300px] w-auto object-contain rounded-lg" />
+                  )}
 
-                {showArtifactBoxes && report.artifactRegions && report.artifactRegions.map((region, i) => (
-                  <div
-                    key={i}
-                    style={{ left: `${region.x}%`, top: `${region.y}%`, width: `${region.width}%`, height: `${region.height}%` }}
-                    className="absolute border border-red-400 bg-red-500/10 rounded pointer-events-none p-1"
-                  >
-                    <span className="text-[8px] font-mono bg-slate-950 text-red-300 px-1 py-0.2 rounded border border-red-500/40">
-                      {region.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Toolbar */}
-              <div className="flex items-center justify-between gap-2 mt-3 p-2 bg-slate-950 rounded-xl border border-slate-800 text-xs">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-slate-500">Filter:</span>
-                  {['original', 'ela', 'noise'].map((mode) => (
-                    <button
-                      key={mode}
-                      onClick={() => setFilterMode(mode)}
-                      className={`px-2 py-0.5 rounded text-[11px] font-mono uppercase ${
-                        filterMode === mode ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'
-                      }`}
+                  {showArtifactBoxes && report.artifactRegions && report.artifactRegions.map((region, i) => (
+                    <div
+                      key={i}
+                      style={{ left: `${region.x}%`, top: `${region.y}%`, width: `${region.width}%`, height: `${region.height}%` }}
+                      className="absolute border border-red-400 bg-red-500/10 rounded pointer-events-none p-1"
                     >
-                      {mode}
-                    </button>
+                      <span className="text-[8px] font-mono bg-slate-950 text-red-300 px-1 py-0.2 rounded border border-red-500/40">
+                        {region.label}
+                      </span>
+                    </div>
                   ))}
                 </div>
 
-                <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showArtifactBoxes}
-                    onChange={(e) => setShowArtifactBoxes(e.target.checked)}
-                    className="rounded bg-slate-800 border-slate-700 text-sky-400 focus:ring-0"
-                  />
-                  <span>Markers</span>
-                </label>
+                {/* Toolbar */}
+                <div className="flex items-center justify-between gap-2 mt-3 p-2.5 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-500 font-medium">Filter Mode:</span>
+                    {['original', 'ela', 'noise'].map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => setFilterMode(mode)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-mono uppercase transition-all ${
+                          filterMode === mode ? 'bg-sky-600 text-white font-bold shadow-sm' : 'text-slate-400 hover:text-white bg-slate-900'
+                        }`}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+
+                  <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={showArtifactBoxes}
+                      onChange={(e) => setShowArtifactBoxes(e.target.checked)}
+                      className="rounded bg-slate-800 border-slate-700 text-sky-400 focus:ring-0"
+                    />
+                    <span>Anomaly Markers</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Metrics */}
+              <div className="lg:col-span-5 space-y-3.5">
+                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3.5 text-xs">
+                  <div>
+                    <div className="flex justify-between mb-1.5">
+                      <span className="text-slate-400 font-medium">ELA Compression Discrepancy:</span>
+                      <span className="font-mono font-bold text-red-400">{report.forensicMetrics?.elaDiscrepancy || 88}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                      <div className="h-full bg-gradient-to-r from-amber-500 to-red-500" style={{ width: `${report.forensicMetrics?.elaDiscrepancy || 88}%` }} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between mb-1.5">
+                      <span className="text-slate-400 font-medium">Diffusion Noise Variance:</span>
+                      <span className="font-mono font-bold text-amber-400">{report.forensicMetrics?.noisePatternVariance || 79}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                      <div className="h-full bg-gradient-to-r from-sky-500 to-amber-500" style={{ width: `${report.forensicMetrics?.noisePatternVariance || 79}%` }} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 text-xs text-slate-400 leading-relaxed font-mono">
+                  {report.technicalBreakdown?.sensorConsistencyAnalysis || 'High-frequency boundary channels reveal non-Bayer photon distributions.'}
+                </div>
               </div>
             </div>
 
-            {/* Metrics */}
-            <div className="lg:col-span-5 space-y-3">
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 text-xs">
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-slate-400">ELA Discrepancy:</span>
-                    <span className="font-mono font-bold text-red-400">{report.forensicMetrics?.elaDiscrepancy || 88}%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-red-500" style={{ width: `${report.forensicMetrics?.elaDiscrepancy || 88}%` }} />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-slate-400">Diffusion Noise Pattern:</span>
-                    <span className="font-mono font-bold text-amber-400">{report.forensicMetrics?.noisePatternVariance || 79}%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-amber-500" style={{ width: `${report.forensicMetrics?.noisePatternVariance || 79}%` }} />
-                  </div>
-                </div>
+            {/* Plain-English Forensic Guide Box */}
+            <div className="p-4 rounded-2xl bg-sky-950/20 border border-sky-500/20 text-xs space-y-2">
+              <div className="flex items-center gap-2 text-sky-400 font-bold">
+                <Eye className="w-4 h-4" />
+                <span>How to Understand Image ELA (Error Level Analysis):</span>
               </div>
-
-              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 text-xs text-slate-400 leading-relaxed">
-                {report.technicalBreakdown?.sensorConsistencyAnalysis || 'High-frequency boundary channels reveal non-Bayer photon distributions.'}
-              </div>
+              <p className="text-slate-300 leading-relaxed">
+                • <strong className="text-white">Compression Uniformity:</strong> Real camera photos compress evenly across the whole frame. When AI creates or edits an image, modified regions (like faces, text, or hands) compress differently. ELA lights up these manipulated seams in bright glowing colors.
+              </p>
+              <p className="text-slate-300 leading-relaxed">
+                • <strong className="text-white">Sensor Photon Noise:</strong> Physical cameras leave microscopic photon noise from their hardware sensor (Bayer matrix). AI images lack this natural grain, showing unnatural mathematical smoothness.
+              </p>
             </div>
           </div>
         )}
 
         {/* TAB 2: Audio Phonation */}
         {activeTab === 'audio-spectrum' && (
-          <div className="pt-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-7">
-              <div className="bg-slate-950 rounded-2xl p-3 border border-slate-800">
-                <canvas ref={audioCanvasRef} className="w-full h-40 rounded-lg border border-slate-800" />
+          <div className="pt-6 space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-7">
+                <div className="bg-slate-950 rounded-2xl p-3 border border-slate-800">
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800/80 text-[11px] text-slate-400 font-mono">
+                    <span className="flex items-center gap-1.5 text-sky-400 font-bold">
+                      <Activity className="w-3.5 h-3.5" />
+                      <span>Fourier Frequency Spectrogram</span>
+                    </span>
+                    <span>20 Hz – 24,000 Hz</span>
+                  </div>
+                  <canvas ref={audioCanvasRef} className="w-full h-44 rounded-lg border border-slate-800 bg-[#090D16]" />
+                </div>
+              </div>
+
+              <div className="lg:col-span-5 space-y-3 text-xs">
+                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <span className="text-slate-400 font-medium">Spectral Bandwidth:</span>
+                    <span className="font-mono font-bold text-red-400 bg-red-950/40 px-2 py-0.5 rounded border border-red-500/30">
+                      16.2 kHz (Cutoff)
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <span className="text-slate-400 font-medium">Glottal Pulse Jitter:</span>
+                    <span className="font-mono font-bold text-amber-400 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/30">
+                      0.03% (Robotic)
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 font-medium">Vocal Tract Phonation:</span>
+                    <span className="font-mono font-bold text-red-400">Synthetic Neural Vocoder</span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 text-xs text-slate-400 leading-relaxed font-mono">
+                  Acoustic analysis detected mathematical frequency clipping above 16.2 kHz with abnormally low micro-pitch fluctuations.
+                </div>
               </div>
             </div>
 
-            <div className="lg:col-span-5 space-y-3 text-xs">
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Spectral Bandwidth:</span>
-                  <span className="font-mono font-bold text-red-400">16.2 kHz (Cutoff)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Glottal Pulse Jitter:</span>
-                  <span className="font-mono font-bold text-amber-400">0.03% (Robotic)</span>
-                </div>
+            {/* Plain-English Forensic Guide Box for Audio */}
+            <div className="p-4 rounded-2xl bg-sky-950/20 border border-sky-500/20 text-xs space-y-2.5">
+              <div className="flex items-center gap-2 text-sky-400 font-bold">
+                <Music className="w-4 h-4" />
+                <span>Why These Audio Metrics Prove AI Generation (Plain English):</span>
+              </div>
+              <div className="space-y-2 text-slate-300 leading-relaxed">
+                <p>
+                  • <strong className="text-white">16.2 kHz Spectral Cutoff:</strong> Natural human speech and studio microphones capture rich vocal harmonics up to 20,000 Hz (20 kHz). AI voice cloning models (such as ElevenLabs, Tortoise, or VALL-E) hard-cap sound frequencies at 16.2 kHz to save computing power. In the spectrogram above, the red dashed line shows sound abruptly vanishing above 16.2 kHz.
+                </p>
+                <p>
+                  • <strong className="text-white">Glottal Pulse Jitter (0.03% Robotic):</strong> Human vocal cords never vibrate with 100% mechanical perfection; natural human speech always has tiny micro-variations (jitter of 0.5% to 2.0%). AI voices are generated by computer math algorithms that produce unnaturally flat, rigid pulses (0.03%), which acoustic forensics instantly catches.
+                </p>
               </div>
             </div>
           </div>
@@ -294,44 +347,130 @@ export default function ForensicDeepDiveView({ report, onOpenExportModal }) {
 
         {/* TAB 3: Video Temporal */}
         {activeTab === 'video-temporal' && (
-          <div className="pt-6 space-y-4">
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs">
-              <div className="flex justify-between mb-2">
-                <span className="font-bold text-slate-300">Temporal Anomaly Timeline</span>
-                <span className="text-red-400 font-mono">3 Anomaly Keyframes Flagged</span>
+          <div className="pt-6 space-y-6">
+            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 text-xs space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+                <span className="font-bold text-white flex items-center gap-2">
+                  <Video className="w-4 h-4 text-sky-400" />
+                  <span>Temporal Anomaly & Keyframe Timeline</span>
+                </span>
+                <span className="text-red-400 font-mono text-[11px] font-bold bg-red-950/40 px-2 py-0.5 rounded border border-red-500/30">
+                  3 Keyframe Anomalies Flagged
+                </span>
               </div>
-              <div className="w-full h-2 bg-slate-800 rounded-full relative">
-                <span className="absolute left-[20%] -top-0.5 w-3 h-3 rounded-full bg-amber-400" title="00:03 Boundary Jitter"></span>
-                <span className="absolute left-[52%] -top-0.5 w-3 h-3 rounded-full bg-red-500" title="00:08 Lip Viseme Desync"></span>
-                <span className="absolute left-[78%] -top-0.5 w-3 h-3 rounded-full bg-red-500" title="00:12 Ear Blending"></span>
+
+              {/* Visual timeline bar */}
+              <div className="space-y-1.5 pt-2">
+                <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                  <span>00:00</span>
+                  <span>00:05</span>
+                  <span>00:10</span>
+                  <span>00:15</span>
+                </div>
+                <div className="w-full h-3 bg-slate-900 rounded-full relative border border-slate-800">
+                  <div className="absolute left-[20%] -top-1 w-5 h-5 rounded-full bg-amber-400/20 border-2 border-amber-400 flex items-center justify-center cursor-pointer" title="00:03 Boundary Jitter">
+                    <span className="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>
+                  </div>
+                  <div className="absolute left-[52%] -top-1 w-5 h-5 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center cursor-pointer" title="00:08 Lip Viseme Desync">
+                    <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                  </div>
+                  <div className="absolute left-[78%] -top-1 w-5 h-5 rounded-full bg-red-500/20 border-2 border-red-500 flex items-center justify-center cursor-pointer" title="00:12 Ear Blending">
+                    <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                  </div>
+                </div>
               </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3">
+                <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800">
+                  <span className="text-slate-400 text-[11px] block">Lip Viseme Sync</span>
+                  <span className="font-mono text-red-400 font-bold text-xs mt-0.5 block">Desynced on /p/, /b/</span>
+                </div>
+                <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800">
+                  <span className="text-slate-400 text-[11px] block">PERCLOS Eye Blinking</span>
+                  <span className="font-mono text-amber-400 font-bold text-xs mt-0.5 block">4.1 blinks/min (Low)</span>
+                </div>
+                <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800">
+                  <span className="text-slate-400 text-[11px] block">Boundary Stability</span>
+                  <span className="font-mono text-red-400 font-bold text-xs mt-0.5 block">Warping Detected</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Plain English Deepfake Guide */}
+            <div className="p-4 rounded-2xl bg-sky-950/20 border border-sky-500/20 text-xs space-y-2">
+              <div className="flex items-center gap-2 text-sky-400 font-bold">
+                <Video className="w-4 h-4" />
+                <span>How Video Deepfake Forensics Works (Plain English):</span>
+              </div>
+              <p className="text-slate-300 leading-relaxed">
+                • <strong className="text-white">Lip-Sync Desynchronization (Visemes):</strong> Deepfake engines often fail to accurately match mouth geometry with sudden phonetic stop sounds (like 'P', 'B', and 'M') where the lips must physically touch.
+              </p>
+              <p className="text-slate-300 leading-relaxed">
+                • <strong className="text-white">Blink Micro-Dynamics:</strong> Real humans naturally blink 15–20 times per minute. Neural video generators frequently generate unnaturally static eyes or glitchy eyelid frames.
+              </p>
             </div>
           </div>
         )}
 
         {/* TAB 4: Metadata & C2PA */}
         {activeTab === 'metadata-c2pa' && (
-          <div className="pt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-              <div className="text-slate-500 font-sans font-bold uppercase text-[10px]">Camera Telemetry</div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Make:</span>
-                <span className="text-slate-300">{report.exifData?.make || 'Unknown'}</span>
+          <div className="pt-6 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+                <div className="text-slate-400 font-sans font-bold uppercase text-[11px] flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Camera Hardware Telemetry</span>
+                </div>
+                <div className="flex justify-between pb-1.5 border-b border-slate-800/80">
+                  <span className="text-slate-500">Sensor Hardware:</span>
+                  <span className="text-slate-300">{report.exifData?.make || 'None (Synthetic Canvas)'}</span>
+                </div>
+                <div className="flex justify-between pb-1.5 border-b border-slate-800/80">
+                  <span className="text-slate-500">Software Origin:</span>
+                  <span className="text-sky-400 font-bold">{report.exifData?.software || 'Midjourney Diffusion'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Lens / Focal Length:</span>
+                  <span className="text-slate-400">Unrecorded</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Software:</span>
-                <span className="text-sky-400">{report.exifData?.software || 'Midjourney Diffusion'}</span>
+
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+                <div className="text-slate-400 font-sans font-bold uppercase text-[11px] flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>C2PA Content Credentials</span>
+                </div>
+                <div className="flex justify-between pb-1.5 border-b border-slate-800/80">
+                  <span className="text-slate-500">Hardware Manifest:</span>
+                  <span className={report.authenticityScore > 75 ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold'}>
+                    {report.authenticityScore > 75 ? 'Valid Hardware Signature' : 'No Hardware Signature'}
+                  </span>
+                </div>
+                <div className="flex justify-between pb-1.5 border-b border-slate-800/80">
+                  <span className="text-slate-500">Signer Identity:</span>
+                  <span className="text-slate-400">{report.authenticityScore > 75 ? 'Verified News Agency' : 'Unsigned / AI Latent Origin'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Trust Chain:</span>
+                  <span className={report.authenticityScore > 75 ? 'text-emerald-400' : 'text-red-400'}>
+                    {report.authenticityScore > 75 ? 'C2PA Root Valid' : 'Missing Root Trust'}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-              <div className="text-slate-500 font-sans font-bold uppercase text-[10px]">C2PA Credentials</div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Manifest:</span>
-                <span className={report.authenticityScore > 75 ? 'text-emerald-400' : 'text-red-400'}>
-                  {report.authenticityScore > 75 ? 'Valid Hardware Signature' : 'No Valid Signature'}
-                </span>
+            {/* Plain English C2PA Guide */}
+            <div className="p-4 rounded-2xl bg-sky-950/20 border border-sky-500/20 text-xs space-y-2">
+              <div className="flex items-center gap-2 text-sky-400 font-bold">
+                <Shield className="w-4 h-4" />
+                <span>What is C2PA & Content Credentials? (Plain English):</span>
               </div>
+              <p className="text-slate-300 leading-relaxed">
+                • <strong className="text-white">Digital Birth Certificate:</strong> C2PA (Coalition for Content Provenance and Authenticity) is the global gold standard for media verification. When a photo is taken on a real certified camera, the camera embeds an unforgeable cryptographic digital signature.
+              </p>
+              <p className="text-slate-300 leading-relaxed">
+                • <strong className="text-white">Why AI Fails C2PA:</strong> AI tools generate images directly from neural network pixels in computer memory. They lack a physical camera sensor key, so their C2PA trust chain is flagged as missing or synthetic.
+              </p>
             </div>
           </div>
         )}

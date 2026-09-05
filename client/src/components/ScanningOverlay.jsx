@@ -1,48 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Sparkles, Cpu, Layers, Radio, CheckCircle2 } from 'lucide-react';
+import { Shield, Sparkles, Cpu, Layers, Radio, CheckCircle2, Search, Database } from 'lucide-react';
 
 export default function ScanningOverlay() {
   const [step, setStep] = useState(0);
 
   const steps = [
-    { name: 'Extracting Latent Spatial Gradients & Pixel Residuals', icon: Layers },
-    { name: 'Executing Real-Time Error Level Analysis (ELA)', icon: Cpu },
-    { name: 'Analyzing Fourier High-Frequency Spectrum & Phonation Cutoffs', icon: Radio },
-    { name: 'Inspecting C2PA Manifest & Sensor Bayer Noise Signatures', icon: Shield },
-    { name: 'Synthesizing Explainable GenAI Forensic Verdict', icon: Sparkles }
+    { name: 'Inspecting digital pixels & compression edges', icon: Layers },
+    { name: 'Running Google Gemini Multimodal Vision AI', icon: Sparkles },
+    { name: 'Checking camera sensor noise & genuine lens data', icon: Cpu },
+    { name: 'Checking global fact-check databases & news archives', icon: Database },
+    { name: 'Generating clear citizen verdict & summary', icon: Shield }
   ];
 
   useEffect(() => {
     const interval = setInterval(() => {
       setStep((prev) => (prev < steps.length - 1 ? prev + 1 : prev));
-    }, 450);
+    }, 400);
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="max-w-2xl mx-auto px-4 my-8">
-      <div className="glass-panel-glow-cyan p-8 rounded-3xl text-center relative overflow-hidden bg-slate-950/90 border border-cyan-500/40">
+    <div className="max-w-xl mx-auto px-4 my-8 animate-fadeIn">
+      <div className="glass-panel p-6 sm:p-8 rounded-3xl text-center relative overflow-hidden bg-slate-950/90 border border-sky-500/40 shadow-2xl shadow-sky-950/30">
         
-        {/* Animated Scanning Line */}
+        {/* Animated Scanning Beam */}
         <div className="scan-beam"></div>
 
         {/* Central Pulsing Radar */}
-        <div className="relative w-24 h-24 mx-auto mb-6 flex items-center justify-center">
-          <div className="absolute inset-0 rounded-full bg-cyan-500/15 border border-cyan-400/40 pulse-radar"></div>
-          <div className="w-16 h-16 rounded-full bg-cyan-500/20 border-2 border-cyan-400 flex items-center justify-center text-cyan-300 shadow-lg shadow-cyan-500/30">
-            <Cpu className="w-8 h-8 animate-pulse" />
+        <div className="relative w-20 h-20 mx-auto mb-5 flex items-center justify-center">
+          <div className="absolute inset-0 rounded-full bg-sky-500/15 border border-sky-400/40 pulse-radar"></div>
+          <div className="w-14 h-14 rounded-full bg-sky-500/20 border-2 border-sky-400 flex items-center justify-center text-sky-300 shadow-lg shadow-sky-500/30">
+            <Sparkles className="w-7 h-7 animate-pulse" />
           </div>
         </div>
 
-        <h3 className="text-xl font-bold text-white mb-2 font-display tracking-tight">
-          Multimodal Neural Forensics Active
+        <h3 className="text-xl font-bold text-white mb-1.5 font-display tracking-tight">
+          Analyzing Media with AI Forensics
         </h3>
         <p className="text-xs text-slate-400 mb-6">
-          Running ensemble deep learning classifiers, spectral harmonics & cryptographic validation...
+          Examining pixels, lighting physics, camera sensors, and fact-checking records...
         </p>
 
         {/* Dynamic Step Progress */}
-        <div className="space-y-2.5 text-left max-w-md mx-auto">
+        <div className="space-y-2 text-left max-w-md mx-auto">
           {steps.map((s, idx) => {
             const Icon = s.icon;
             const isDone = idx < step;
@@ -53,21 +53,21 @@ export default function ScanningOverlay() {
                 key={idx}
                 className={`flex items-center gap-3 p-2.5 rounded-xl border text-xs transition-all duration-300 ${
                   isCurrent
-                    ? 'bg-cyan-950/40 border-cyan-500/50 text-cyan-200 font-semibold scale-[1.02]'
+                    ? 'bg-sky-950/50 border-sky-500/60 text-sky-200 font-semibold scale-[1.02] shadow-sm'
                     : isDone
-                    ? 'bg-slate-900/40 border-slate-800 text-slate-400'
-                    : 'opacity-40 border-transparent text-slate-600'
+                    ? 'bg-slate-900/40 border-slate-800 text-slate-300'
+                    : 'opacity-30 border-transparent text-slate-600'
                 }`}
               >
-                <div className={`p-1.5 rounded-lg ${
-                  isCurrent ? 'bg-cyan-500/20 text-cyan-400 animate-spin' :
+                <div className={`p-1.5 rounded-lg flex-shrink-0 ${
+                  isCurrent ? 'bg-sky-500/20 text-sky-400' :
                   isDone ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-600'
                 }`}>
-                  {isDone ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}
+                  {isDone ? <CheckCircle2 className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
                 </div>
-                <span className="truncate flex-1">{s.name}</span>
+                <span className="truncate flex-1 font-medium">{s.name}</span>
                 {isCurrent && (
-                  <span className="text-[10px] text-cyan-400 font-mono animate-pulse font-bold">Scanning...</span>
+                  <span className="text-[10px] text-sky-400 font-mono animate-pulse font-bold">Scanning...</span>
                 )}
               </div>
             );
