@@ -15,52 +15,53 @@ export default function ExportReportModal({ report, onClose }) {
 
   return (
     <div 
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-6 overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby="report-modal-title"
     >
-      <div className="bg-slate-950 border border-slate-800 rounded-3xl max-w-4xl w-full p-4 sm:p-7 shadow-2xl relative my-auto animate-fadeIn max-h-[95vh] flex flex-col">
+      <div className="bg-slate-950 border border-slate-800 rounded-2xl sm:rounded-3xl max-w-4xl w-full p-3.5 sm:p-7 shadow-2xl relative my-auto animate-fadeIn max-h-[96vh] flex flex-col">
         
         {/* Modal Action Bar (Hidden in Print) */}
-        <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800/80 no-print flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
-              <Shield className="w-5 h-5" />
+        <div className="flex items-center justify-between pb-3 sm:pb-4 mb-3 sm:mb-4 border-b border-slate-800/80 no-print flex-shrink-0 gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 flex-shrink-0">
+              <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <h3 id="report-modal-title" className="text-base font-bold text-white font-display">
+            <div className="min-w-0">
+              <h3 id="report-modal-title" className="text-xs sm:text-base font-bold text-white font-display truncate">
                 Forensic Verification Dossier
               </h3>
-              <p className="text-xs text-slate-400">Clean, printable intelligence report with cryptographic signature</p>
+              <p className="text-[10px] sm:text-xs text-slate-400 truncate">Official printable report with cryptographic signature</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
             <button
               onClick={handlePrint}
-              className="btn-primary text-xs py-2 px-4 flex items-center gap-2 font-bold shadow-lg cursor-pointer"
+              className="btn-primary text-[11px] sm:text-xs py-1.5 sm:py-2 px-2.5 sm:px-4 flex items-center gap-1.5 sm:gap-2 font-bold shadow-lg cursor-pointer"
             >
-              <Printer className="w-4 h-4" />
-              <span>Print / Save as PDF</span>
+              <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span className="hidden xs:inline">Print / </span>
+              <span>Save PDF</span>
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-900 transition-colors cursor-pointer"
+              className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-900 transition-colors cursor-pointer"
               aria-label="Close Report Modal"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
         </div>
 
         {/* Scrollable Document Container */}
-        <div className="overflow-y-auto pr-1">
+        <div className="overflow-y-auto pr-1 -mr-1">
           {/* Printable Official Document */}
           <div 
             id="printable-dossier" 
             ref={printRef} 
-            className="bg-white text-slate-900 p-6 sm:p-10 rounded-2xl shadow-xl font-sans text-xs space-y-6 border border-slate-200"
+            className="bg-white text-slate-900 p-4 sm:p-10 rounded-xl sm:rounded-2xl shadow-xl font-sans text-xs space-y-4 sm:space-y-6 border border-slate-200"
           >
             
             {/* Header / Brand & Document Control */}

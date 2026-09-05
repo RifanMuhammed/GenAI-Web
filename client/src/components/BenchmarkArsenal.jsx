@@ -1,20 +1,20 @@
 import React from 'react';
-import { Sparkles, ImageIcon, Mic, Video, CheckCircle2, AlertTriangle, Flame } from 'lucide-react';
+import { Sparkles, ImageIcon, Mic, Video, Flame } from 'lucide-react';
 
 export default function BenchmarkArsenal({ cases, onSelectCase, activeCaseId, isLoading }) {
   if (!cases || cases.length === 0) return null;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 mb-6">
-      <div className="flex items-center gap-2 mb-2.5">
-        <Flame className="w-4 h-4 text-amber-400" />
-        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-          Try 1-Click Real World Examples:
+    <div className="max-w-4xl mx-auto px-3 sm:px-4 mb-5">
+      <div className="flex items-center gap-1.5 mb-2">
+        <Flame className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+        <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-400">
+          Try 1-Click Examples:
         </span>
       </div>
 
-      {/* Sleek horizontal pill selector */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+      {/* Smooth touch-enabled horizontal scroll container */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 pt-0.5 scrollbar-none -mx-3 px-3 sm:mx-0 sm:px-0 touch-pan-x">
         {cases.map((item) => {
           const isSelected = activeCaseId === item.id;
           const isSynthetic = item.verdict.status === 'SYNTHETIC_MANIPULATED';
@@ -24,9 +24,9 @@ export default function BenchmarkArsenal({ cases, onSelectCase, activeCaseId, is
               key={item.id}
               onClick={() => onSelectCase(item)}
               disabled={isLoading}
-              className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all border ${
+              className={`flex-shrink-0 flex items-center gap-2 px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition-all border active:scale-95 cursor-pointer ${
                 isSelected
-                  ? 'bg-sky-500/20 text-sky-200 border-sky-400 shadow-md shadow-sky-500/10 scale-[1.02]'
+                  ? 'bg-sky-500/20 text-sky-200 border-sky-400 shadow-md shadow-sky-500/10'
                   : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 border-slate-800 hover:border-slate-700'
               }`}
             >
@@ -40,9 +40,9 @@ export default function BenchmarkArsenal({ cases, onSelectCase, activeCaseId, is
                 {item.type === 'video' && <Video className="w-3.5 h-3.5" />}
               </span>
 
-              <span className="truncate max-w-[150px] sm:max-w-[220px]">{item.title}</span>
+              <span className="truncate max-w-[130px] sm:max-w-[200px] text-[11px] sm:text-xs">{item.title}</span>
 
-              <span className={`w-2 h-2 rounded-full ${isSynthetic ? 'bg-red-400 animate-pulse' : 'bg-emerald-400'}`} />
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isSynthetic ? 'bg-red-400 animate-pulse' : 'bg-emerald-400'}`} />
             </button>
           );
         })}
