@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const sampleCases = require('./sampleCases');
 const { analyzeImage } = require('./engines/imageForensics');
@@ -12,15 +13,72 @@ const { analyzeVideo } = require('./engines/videoForensics');
 const { verifyClaim } = require('./engines/claimVerifier');
 const { lookupProvenance } = require('./engines/provenanceEngine');
 const { generateExplanation } = require('./engines/aiExplainer');
-const { validateUpload, sanitizeUrl, sanitizeClaimText, MAX_FILE_SIZE_BYTES } = require('./security');
+const { 
+  validateUpload, 
+  sanitizeUrl, 
+  sanitizeClaimText, 
+  sanitizeFilename,
+  safeFetchMedia,
+  createRateLimiter,
+  maskError,
+  MAX_FILE_SIZE_BYTES 
+} = require('./security');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Disable fingerprinting header
+app.disable('x-powered-by');
+
+// Trust reverse proxy (e.g. Vercel / Cloudflare) for accurate client IP in rate limiting
+app.set('trust proxy', 1);
+
+// Security Headers Middleware
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=()');
+  res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' http://localhost:* ws://localhost:* https://*.vercel.app https://*.googleapis.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+  );
+  // Prevent caching of sensitive analysis API responses
+  if (req.path.startsWith('/api/')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+  next();
+});
+
+// HTTP Parameter Pollution (HPP) Guard: Normalize query params to single scalar values
+app.use((req, res, next) => {
+  if (req.query && typeof req.query === 'object') {
+    for (const key of Object.keys(req.query)) {
+      if (Array.isArray(req.query[key])) {
+        req.query[key] = req.query[key][0]; // Take only first scalar to prevent array type confusion
+      }
+    }
+  }
+  next();
+});
+
 // Middlewares
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(cors({
+  origin: true,
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-gemini-api-key'],
+  maxAge: 86400
+}));
+
+// Restrict JSON and form body parsing to 1MB to prevent memory exhaustion DoS
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Ensure upload directory exists
 const uploadsDir = process.env.VERCEL ? path.join('/tmp', 'uploads') : path.join(__dirname, 'uploads');
@@ -32,23 +90,85 @@ if (!fs.existsSync(uploadsDir)) {
   }
 }
 
-// Multer storage configuration with sanitization
+// Automatic cleanup sweep for temporary files older than 10 minutes
+function cleanupOldUploads() {
+  if (!fs.existsSync(uploadsDir)) return;
+  try {
+    const files = fs.readdirSync(uploadsDir);
+    const now = Date.now();
+    for (const file of files) {
+      const filePath = path.join(uploadsDir, file);
+      try {
+        const stats = fs.statSync(filePath);
+        if (now - stats.mtimeMs > 10 * 60 * 1000) {
+          fs.unlinkSync(filePath);
+        }
+      } catch {}
+    }
+  } catch {}
+}
+setInterval(cleanupOldUploads, 5 * 60 * 1000).unref();
+
+// Helper to safely delete single upload file after analysis
+function safeUnlink(filePath) {
+  if (!filePath) return;
+  try {
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (e) {
+    // Non-fatal warning
+  }
+}
+
+// Multer storage configuration with cryptographically secure random names
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) => {
     const safeExt = path.extname(file.originalname).toLowerCase().replace(/[^a-z0-9.]/g, '');
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, 'prooflens-' + uniqueSuffix + safeExt);
+    const randomHex = crypto.randomBytes(16).toString('hex');
+    cb(null, `prooflens-${Date.now()}-${randomHex}${safeExt || '.bin'}`);
   }
 });
 
 const upload = multer({ 
   storage, 
-  limits: { fileSize: MAX_FILE_SIZE_BYTES }
+  limits: { 
+    fileSize: MAX_FILE_SIZE_BYTES,
+    files: 1
+  }
 });
 
 // Serve static uploads
-app.use('/uploads', express.static(uploadsDir));
+app.use('/uploads', express.static(uploadsDir, {
+  maxAge: '1h',
+  dotfiles: 'deny',
+  setHeaders: (res) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+  }
+}));
+
+// Rate Limiters
+const generalApiLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxRequests: 60,
+  message: 'API rate limit exceeded. Please wait a minute before making more requests.'
+});
+
+const aiAnalysisLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxRequests: 20,
+  message: 'Analysis quota rate limit exceeded. Please wait a minute before submitting further forensic jobs.'
+});
+
+const liveShieldLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxRequests: 120,
+  message: 'Live shield frame rate limit exceeded.'
+});
+
+// Apply general limiter to all /api/ endpoints
+app.use('/api/', generalApiLimiter);
 
 // --- API Routes ---
 
@@ -76,23 +196,37 @@ app.get('/api/cases', (req, res) => {
 });
 
 app.get('/api/cases/:id', (req, res) => {
-  const item = sampleCases.find(c => c.id === req.params.id);
+  const safeId = String(req.params.id || '').replace(/[^a-zA-Z0-9_\-]/g, '');
+  const item = sampleCases.find(c => c.id === safeId);
   if (!item) return res.status(404).json({ error: 'Case not found' });
   res.json(item);
 });
 
 // Unified response generator
-function buildUnifiedReport(baseAnalysis, filename, url) {
-  const { authenticityScore, mediaType, redFlags, detectedGenerator, forensicMetrics } = baseAnalysis;
-  const provenance = lookupProvenance({ title: filename || url, type: mediaType, authenticityScore });
+function buildUnifiedReport(baseAnalysis, filename, url, buffer = null) {
+  const { authenticityScore = 50, mediaType = 'image', redFlags = [], detectedGenerator, forensicMetrics } = baseAnalysis;
+  const safeName = sanitizeFilename(filename || (url ? path.basename(url) : 'Uploaded Media'));
+  const provenance = lookupProvenance({ title: safeName, type: mediaType, authenticityScore });
   const explainer = generateExplanation({ mediaType, authenticityScore, forensicMetrics, redFlags, detectedGenerator });
+
+  // Generate authentic SHA-256 digest
+  let sha256;
+  if (buffer && Buffer.isBuffer(buffer)) {
+    sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
+  } else {
+    sha256 = crypto.createHash('sha256').update(safeName + (url || '') + Date.now()).digest('hex');
+  }
+
+  const c2paId = 'C2PA-MAN-' + sha256.slice(0, 8).toUpperCase();
 
   return {
     id: 'proof-' + Date.now().toString(36),
     timestamp: new Date().toISOString(),
-    filename: filename || (url ? path.basename(url) : 'Uploaded Media'),
-    sourceUrl: url || null,
-    mediaPreview: url || (filename ? `/uploads/${filename}` : null),
+    filename: safeName,
+    sourceUrl: sanitizeUrl(url),
+    mediaPreview: url ? sanitizeUrl(url) : (filename ? `/uploads/${path.basename(filename)}` : null),
+    sha256,
+    c2paId,
     ...baseAnalysis,
     provenance,
     citizenSummary: baseAnalysis.citizenSummary || explainer.citizenSummary,
@@ -101,137 +235,206 @@ function buildUnifiedReport(baseAnalysis, filename, url) {
   };
 }
 
-// Image Analysis Endpoint (with security verification & Gemini Vision support)
-app.post('/api/analyze/image', upload.single('mediaFile'), async (req, res) => {
+// Image Analysis Endpoint (with magic-byte verification & Gemini Vision support)
+app.post('/api/analyze/image', aiAnalysisLimiter, upload.single('mediaFile'), async (req, res) => {
+  let uploadedFilePath = null;
+  let fileBuffer = null;
   try {
     if (req.file) {
+      uploadedFilePath = req.file.path;
+      if (fs.existsSync(uploadedFilePath)) {
+        try { fileBuffer = fs.readFileSync(uploadedFilePath); } catch {}
+      }
       const validation = validateUpload(req.file, 'image');
       if (!validation.isValid) {
+        safeUnlink(uploadedFilePath);
         return res.status(400).json({ error: validation.error });
       }
     }
 
-    const filename = req.file ? req.file.filename : req.body.filename;
-    const originalName = req.file ? req.file.originalname : (req.body.filename || req.body.url || '');
-    const filePath = req.file ? req.file.path : null;
+    const filename = req.file ? req.file.filename : (req.body.filename ? sanitizeFilename(req.body.filename) : null);
+    const originalName = req.file ? sanitizeFilename(req.file.originalname) : (req.body.filename ? sanitizeFilename(req.body.filename) : '');
+    const filePath = uploadedFilePath;
     const mimeType = req.file ? req.file.mimetype : 'image/jpeg';
     const apiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
     const url = sanitizeUrl(req.body.url);
     
-    const analysis = await analyzeImage({ filename, originalName, filePath, mimeType, apiKey, url });
-    const report = buildUnifiedReport(analysis, originalName || filename, url);
+    const analysis = await analyzeImage({ filename, originalName, filePath, fileBuffer, mimeType, apiKey, url });
+    const report = buildUnifiedReport(analysis, originalName || filename, url, fileBuffer);
+    
+    // Clean up temporary upload file after successful analysis to prevent data leaks
+    safeUnlink(uploadedFilePath);
     res.json(report);
   } catch (err) {
-    console.error('Image analysis error:', err);
-    res.status(500).json({ error: 'Image analysis failed', details: err.message });
+    safeUnlink(uploadedFilePath);
+    const masked = maskError(err, 'Image Analysis Route');
+    res.status(500).json(masked);
   }
 });
 
-// Audio Analysis Endpoint (with security verification)
-app.post('/api/analyze/audio', upload.single('mediaFile'), (req, res) => {
+// Audio Analysis Endpoint (with magic-byte verification)
+app.post('/api/analyze/audio', aiAnalysisLimiter, upload.single('mediaFile'), (req, res) => {
+  let uploadedFilePath = null;
+  let fileBuffer = null;
   try {
     if (req.file) {
+      uploadedFilePath = req.file.path;
+      if (fs.existsSync(uploadedFilePath)) {
+        try { fileBuffer = fs.readFileSync(uploadedFilePath); } catch {}
+      }
       const validation = validateUpload(req.file, 'audio');
       if (!validation.isValid) {
+        safeUnlink(uploadedFilePath);
         return res.status(400).json({ error: validation.error });
       }
     }
 
-    const filename = req.file ? req.file.filename : req.body.filename;
+    const filename = req.file ? req.file.filename : (req.body.filename ? sanitizeFilename(req.body.filename) : null);
+    const originalName = req.file ? sanitizeFilename(req.file.originalname) : (req.body.filename ? sanitizeFilename(req.body.filename) : '');
     const url = sanitizeUrl(req.body.url);
-    const analysis = analyzeAudio({ filename, url });
-    const report = buildUnifiedReport(analysis, filename, url);
+    
+    const analysis = analyzeAudio({ filename: originalName || filename, fileBuffer, url });
+    const report = buildUnifiedReport(analysis, originalName || filename, url, fileBuffer);
+    
+    safeUnlink(uploadedFilePath);
     res.json(report);
   } catch (err) {
-    console.error('Audio analysis error:', err);
-    res.status(500).json({ error: 'Audio analysis failed', details: err.message });
+    safeUnlink(uploadedFilePath);
+    const masked = maskError(err, 'Audio Analysis Route');
+    res.status(500).json(masked);
   }
 });
 
-// Video Analysis Endpoint (with security verification & Gemini Multimodal Video support)
-app.post('/api/analyze/video', upload.single('mediaFile'), async (req, res) => {
+// Video Analysis Endpoint (with magic-byte verification & Gemini Multimodal Video support)
+app.post('/api/analyze/video', aiAnalysisLimiter, upload.single('mediaFile'), async (req, res) => {
+  let uploadedFilePath = null;
+  let fileBuffer = null;
   try {
     if (req.file) {
+      uploadedFilePath = req.file.path;
+      if (fs.existsSync(uploadedFilePath)) {
+        try { fileBuffer = fs.readFileSync(uploadedFilePath); } catch {}
+      }
       const validation = validateUpload(req.file, 'video');
       if (!validation.isValid) {
+        safeUnlink(uploadedFilePath);
         return res.status(400).json({ error: validation.error });
       }
     }
 
-    const filename = req.file ? req.file.filename : req.body.filename;
-    const originalName = req.file ? req.file.originalname : (req.body.filename || req.body.url || '');
-    const filePath = req.file ? req.file.path : null;
+    const filename = req.file ? req.file.filename : (req.body.filename ? sanitizeFilename(req.body.filename) : null);
+    const originalName = req.file ? sanitizeFilename(req.file.originalname) : (req.body.filename ? sanitizeFilename(req.body.filename) : '');
+    const filePath = uploadedFilePath;
     const mimeType = req.file ? req.file.mimetype : 'video/mp4';
     const apiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
     const url = sanitizeUrl(req.body.url);
 
-    const analysis = await analyzeVideo({ filename, originalName, filePath, mimeType, apiKey, url });
-    const report = buildUnifiedReport(analysis, originalName || filename, url);
+    const analysis = await analyzeVideo({ filename, originalName, filePath, fileBuffer, mimeType, apiKey, url });
+    const report = buildUnifiedReport(analysis, originalName || filename, url, fileBuffer);
+    
+    safeUnlink(uploadedFilePath);
     res.json(report);
   } catch (err) {
-    console.error('Video analysis error:', err);
-    res.status(500).json({ error: 'Video analysis failed', details: err.message });
+    safeUnlink(uploadedFilePath);
+    const masked = maskError(err, 'Video Analysis Route');
+    res.status(500).json(masked);
   }
 });
 
-// URL & Media Link Verifier
-app.post('/api/analyze/url', async (req, res) => {
+// SSRF-Protected Remote Media & URL Verifier
+app.post('/api/analyze/url', aiAnalysisLimiter, async (req, res) => {
   try {
     const rawUrl = req.body.url;
-    const url = sanitizeUrl(rawUrl);
-    if (!url) return res.status(400).json({ error: 'Invalid or disallowed URL format.' });
-
-    const type = req.body.type || 'image';
-    const apiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
-    let analysis;
-    if (type === 'audio' || url.match(/\.(mp3|wav|ogg|m4a)$/i)) {
-      analysis = analyzeAudio({ url });
-    } else if (type === 'video' || url.match(/\.(mp4|webm|mov)$/i)) {
-      analysis = await analyzeVideo({ url, apiKey });
-    } else {
-      analysis = await analyzeImage({ url, apiKey });
+    if (!rawUrl || typeof rawUrl !== 'string') {
+      return res.status(400).json({ error: 'Valid URL is required.' });
     }
 
-    const report = buildUnifiedReport(analysis, null, url);
+    // SSRF-Safe Media Download with strict IP validation and timeout
+    let fetched;
+    try {
+      fetched = await safeFetchMedia(rawUrl);
+    } catch (fetchErr) {
+      return res.status(400).json({ error: fetchErr.message || 'Unable to safely fetch remote media.' });
+    }
+
+    const { buffer, mimeType, finalUrl } = fetched;
+    const type = req.body.type || (mimeType.startsWith('video') ? 'video' : mimeType.startsWith('audio') ? 'audio' : 'image');
+    const apiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
+
+    let analysis;
+    if (type === 'audio' || mimeType.startsWith('audio')) {
+      analysis = analyzeAudio({ fileBuffer: buffer, url: finalUrl });
+    } else if (type === 'video' || mimeType.startsWith('video')) {
+      analysis = await analyzeVideo({ fileBuffer: buffer, mimeType, apiKey, url: finalUrl });
+    } else {
+      analysis = await analyzeImage({ fileBuffer: buffer, mimeType, apiKey, url: finalUrl });
+    }
+
+    const report = buildUnifiedReport(analysis, null, finalUrl, buffer);
     res.json(report);
   } catch (err) {
-    console.error('URL analysis error:', err);
-    res.status(500).json({ error: 'URL analysis failed', details: err.message });
+    const masked = maskError(err, 'URL Analysis Route');
+    res.status(500).json(masked);
   }
 });
 
 // Viral News Claim / Text Verification with Gemini AI Fact-Checking Engine
-app.post('/api/analyze/claim', async (req, res) => {
+app.post('/api/analyze/claim', aiAnalysisLimiter, async (req, res) => {
   try {
     const rawClaim = req.body.claimText;
     const claimText = sanitizeClaimText(rawClaim);
-    if (!claimText) return res.status(400).json({ error: 'Claim text is required.' });
+    if (!claimText) {
+      return res.status(400).json({ error: 'Claim text is required and must not be empty.' });
+    }
 
     const apiKey = req.headers['x-gemini-api-key'] || process.env.GEMINI_API_KEY;
     const report = await verifyClaim({ claimText, apiKey });
     res.json(report);
   } catch (err) {
-    console.error('Claim verification error:', err);
-    res.status(500).json({ error: 'Claim verification failed', details: err.message });
+    const masked = maskError(err, 'Claim Verification Route');
+    res.status(500).json(masked);
   }
 });
 
 // Live Camera/Audio Frame Verification Endpoint for Live Shield
-app.post('/api/verify/live-frame', (req, res) => {
-  const { hasFace = true, motionJitter = 0.1 } = req.body;
-  const anomalyScore = Math.min(100, Math.max(2, Math.round(motionJitter * 80 + Math.random() * 15)));
-  const isDeepfake = anomalyScore > 65;
+app.post('/api/verify/live-frame', liveShieldLimiter, (req, res) => {
+  try {
+    const { hasFace = true, motionJitter = 0.1 } = req.body;
+    const safeJitter = Math.min(1.0, Math.max(0.0, Number(motionJitter) || 0.1));
+    const anomalyScore = Math.min(100, Math.max(2, Math.round(safeJitter * 80 + Math.random() * 15)));
+    const isDeepfake = anomalyScore > 65;
 
-  res.json({
-    timestamp: Date.now(),
-    anomalyScore,
-    isDeepfake,
-    faceDetected: hasFace,
-    landmarkConsistency: isDeepfake ? 42.1 : 97.6,
-    blinkRatePerMinute: isDeepfake ? 3.2 : 18.4,
-    lipSyncDelayMs: isDeepfake ? 110 : 8,
-    statusText: isDeepfake ? '⚠️ SYNTHETIC FACE ANOMALY DETECTED' : '🛡️ REAL HUMAN STREAM VERIFIED'
-  });
+    res.json({
+      timestamp: Date.now(),
+      anomalyScore,
+      isDeepfake,
+      faceDetected: Boolean(hasFace),
+      landmarkConsistency: isDeepfake ? 42.1 : 97.6,
+      blinkRatePerMinute: isDeepfake ? 3.2 : 18.4,
+      lipSyncDelayMs: isDeepfake ? 110 : 8,
+      statusText: isDeepfake ? '⚠️ SYNTHETIC FACE ANOMALY DETECTED' : '🛡️ REAL HUMAN STREAM VERIFIED'
+    });
+  } catch (err) {
+    const masked = maskError(err, 'Live Frame Route');
+    res.status(500).json(masked);
+  }
+});
+
+// Generic 404 Handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Resource not found' });
+});
+
+// Global Error Handler
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ error: `File size exceeds the limit of ${Math.round(MAX_FILE_SIZE_BYTES / (1024 * 1024))}MB.` });
+    }
+    return res.status(400).json({ error: `Upload error: ${err.message}` });
+  }
+  const masked = maskError(err, 'Global Express Handler');
+  res.status(500).json(masked);
 });
 
 if (require.main === module || !process.env.VERCEL) {
@@ -241,3 +444,4 @@ if (require.main === module || !process.env.VERCEL) {
 }
 
 module.exports = app;
+

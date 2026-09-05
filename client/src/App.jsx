@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { AlertCircle, X } from 'lucide-react';
 import Navbar from './components/Navbar';
 import HeroSection from './components/HeroSection';
 import BenchmarkArsenal from './components/BenchmarkArsenal';
@@ -15,6 +16,7 @@ export default function App() {
   const [activeCaseId, setActiveCaseId] = useState('case-pope-puffer');
   const [currentReport, setCurrentReport] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
 
   // Fetch benchmark cases on initial mount
@@ -44,10 +46,13 @@ export default function App() {
           });
         }
       })
-      .catch(err => console.error('Failed to load benchmark cases:', err));
+      .catch(err => {
+        console.error('Failed to load benchmark cases:', err);
+      });
   }, []);
 
   const handleSelectCase = (item) => {
+    setErrorMessage(null);
     setActiveCaseId(item.id);
     setIsLoading(true);
     setTimeout(() => {
@@ -73,6 +78,7 @@ export default function App() {
 
   const handleAnalyzeFile = async (file, type) => {
     setIsLoading(true);
+    setErrorMessage(null);
     setActiveCaseId(null);
 
     const formData = new FormData();
@@ -89,9 +95,14 @@ export default function App() {
         body: formData
       });
       const data = await res.json();
+      if (!res.ok) {
+        setErrorMessage(data.error || 'Media signature validation failed. Please check file format.');
+        return;
+      }
       data.mediaPreview = URL.createObjectURL(file);
       setCurrentReport(data);
     } catch (err) {
+      setErrorMessage('Network error occurred while submitting media for analysis.');
       console.error('Analysis error:', err);
     } finally {
       setIsLoading(false);
@@ -100,6 +111,7 @@ export default function App() {
 
   const handleAnalyzeUrl = async (url, type) => {
     setIsLoading(true);
+    setErrorMessage(null);
     setActiveCaseId(null);
     try {
       const res = await fetch('/api/analyze/url', {
@@ -108,8 +120,13 @@ export default function App() {
         body: JSON.stringify({ url, type })
       });
       const data = await res.json();
+      if (!res.ok) {
+        setErrorMessage(data.error || 'Unable to safely verify remote media URL.');
+        return;
+      }
       setCurrentReport(data);
     } catch (err) {
+      setErrorMessage('Network error occurred while analyzing URL.');
       console.error('URL analysis error:', err);
     } finally {
       setIsLoading(false);
@@ -118,6 +135,7 @@ export default function App() {
 
   const handleAnalyzeClaim = async (claimText) => {
     setIsLoading(true);
+    setErrorMessage(null);
     setActiveCaseId(null);
     try {
       const res = await fetch('/api/analyze/claim', {
@@ -126,8 +144,13 @@ export default function App() {
         body: JSON.stringify({ claimText })
       });
       const data = await res.json();
+      if (!res.ok) {
+        setErrorMessage(data.error || 'Claim verification failed.');
+        return;
+      }
       setCurrentReport(data);
     } catch (err) {
+      setErrorMessage('Network error occurred during fact-check analysis.');
       console.error('Claim verification error:', err);
     } finally {
       setIsLoading(false);
@@ -135,6 +158,7 @@ export default function App() {
   };
 
   const handleReset = () => {
+    setErrorMessage(null);
     if (cases.length > 0) {
       handleSelectCase(cases[0]);
     }
@@ -170,6 +194,26 @@ export default function App() {
           onAnalyzeClaim={handleAnalyzeClaim}
           isLoading={isLoading}
         />
+
+        {/* User Alert / Error Notification Banner */}
+        {errorMessage && (
+          <div className="max-w-4xl mx-auto my-4 p-4 rounded-2xl bg-red-950/70 border border-red-500/50 text-red-200 flex items-start justify-between gap-3 shadow-xl animate-fadeIn">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="text-xs sm:text-sm">
+                <span className="font-bold block text-white mb-0.5">Verification Notice:</span>
+                <span>{errorMessage}</span>
+              </div>
+            </div>
+            <button
+              onClick={() => setErrorMessage(null)}
+              className="p-1 text-red-400 hover:text-white rounded-lg hover:bg-red-900/50 transition-colors cursor-pointer flex-shrink-0"
+              aria-label="Dismiss error"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {isLoading && <ScanningOverlay />}
 
