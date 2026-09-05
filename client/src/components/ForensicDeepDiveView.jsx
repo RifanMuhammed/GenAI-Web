@@ -124,29 +124,29 @@ export default function ForensicDeepDiveView({ report, onOpenExportModal }) {
   if (!report) return null;
 
   return (
-    <section className="max-w-4xl mx-auto px-4 mb-12 animate-fadeIn" aria-labelledby="forensic-dossier-heading">
-      <div className="glass-panel p-6 sm:p-8 rounded-3xl border-slate-800 bg-slate-900/60 shadow-xl">
+    <section className="max-w-4xl mx-auto px-3 sm:px-4 mb-12 animate-fadeIn" aria-labelledby="forensic-dossier-heading">
+      <div className="glass-panel p-4 sm:p-8 rounded-2xl sm:rounded-3xl border-slate-800 bg-slate-900/60 shadow-xl">
         
         {/* Header & Tabs */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-800">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 pb-4 sm:pb-5 border-b border-slate-800">
           <div>
-            <h2 id="forensic-dossier-heading" className="text-lg sm:text-xl font-bold text-white font-display flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-sky-400" />
+            <h2 id="forensic-dossier-heading" className="text-base sm:text-xl font-bold text-white font-display flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-sky-400 flex-shrink-0" />
               <span>Investigative Forensic Analysis</span>
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
               Error Level Analysis, Fourier acoustics, and C2PA Content Credentials
             </p>
           </div>
 
-          {/* Tab Selector */}
-          <div className="flex items-center gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800" role="tablist">
+          {/* Tab Selector with mobile scrollability */}
+          <div className="flex items-center gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800 overflow-x-auto scrollbar-none max-w-full" role="tablist">
             <button
               role="tab"
               aria-selected={activeTab === 'visual-ela'}
               onClick={() => setActiveTab('visual-ela')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                activeTab === 'visual-ela' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 cursor-pointer ${
+                activeTab === 'visual-ela' ? 'bg-slate-800 text-white shadow-sm font-bold' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               Image ELA
@@ -155,8 +155,8 @@ export default function ForensicDeepDiveView({ report, onOpenExportModal }) {
               role="tab"
               aria-selected={activeTab === 'audio-spectrum'}
               onClick={() => setActiveTab('audio-spectrum')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                activeTab === 'audio-spectrum' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 cursor-pointer ${
+                activeTab === 'audio-spectrum' ? 'bg-slate-800 text-white shadow-sm font-bold' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               Audio Spectrum
@@ -165,8 +165,8 @@ export default function ForensicDeepDiveView({ report, onOpenExportModal }) {
               role="tab"
               aria-selected={activeTab === 'video-temporal'}
               onClick={() => setActiveTab('video-temporal')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                activeTab === 'video-temporal' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 cursor-pointer ${
+                activeTab === 'video-temporal' ? 'bg-slate-800 text-white shadow-sm font-bold' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               Video Deepfake
@@ -175,8 +175,8 @@ export default function ForensicDeepDiveView({ report, onOpenExportModal }) {
               role="tab"
               aria-selected={activeTab === 'metadata-c2pa'}
               onClick={() => setActiveTab('metadata-c2pa')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                activeTab === 'metadata-c2pa' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 cursor-pointer ${
+                activeTab === 'metadata-c2pa' ? 'bg-slate-800 text-white shadow-sm font-bold' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               C2PA Provenance

@@ -250,3 +250,20 @@ input[type="range"] {
     display: none !important;
   }
 }
+
+/* Utilities for Mobile & Touch Scrolling */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@media (max-width: 640px) {
+  input[type="text"],
+  input[type="url"],
+  textarea {
+    font-size: 16px !important; /* Prevents auto-zoom on iOS Safari */
+  }
+}
