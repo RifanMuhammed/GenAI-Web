@@ -56,40 +56,55 @@ export default function ProvenanceTimeline({ provenance, report }) {
               <span>Accredited Fact-Checker Status:</span>
             </div>
 
-            {data.factCheckSources && data.factCheckSources.map((src, idx) => (
-              <div
-                key={idx}
-                className="p-3.5 rounded-xl bg-slate-950 border border-slate-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
-              >
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-white">{src.name}</span>
-                    <span className={`text-[9px] font-bold uppercase px-2 py-0.2 rounded-full ${
-                      src.status.includes('SYNTHETIC') || src.status.includes('DEBUNKED') || src.status.includes('FALSE') || src.status.includes('FABRICATED')
-                        ? 'bg-red-500/15 text-red-300 border border-red-500/30'
-                        : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                    }`}>
-                      {src.status}
-                    </span>
-                  </div>
-                  <p className="text-slate-400 text-[11px] max-w-md">
-                    {src.claim || 'Forensic lab corroboration confirms synthetic generation signatures.'}
-                  </p>
-                </div>
-
-                {src.url && (
-                  <a
-                    href={src.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300 font-semibold self-start sm:self-center"
+            {data.factCheckSources && data.factCheckSources.length > 0 ? (
+              data.factCheckSources.map((src, idx) => {
+                const isSafeUrl = src.url && /^https?:\/\//i.test(src.url);
+                return (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-xl bg-slate-950 border border-slate-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
                   >
-                    <span>Read Report</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white">{src.name}</span>
+                        <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                          src.status && (src.status.includes('SYNTHETIC') || src.status.includes('DEBUNKED') || src.status.includes('FALSE') || src.status.includes('FABRICATED'))
+                            ? 'bg-red-500/15 text-red-300 border border-red-500/30'
+                            : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                        }`}>
+                          {src.status || 'UNVERIFIED'}
+                        </span>
+                      </div>
+                      <p className="text-slate-400 text-[11px] max-w-md">
+                        {src.claim || 'Forensic lab corroboration confirms synthetic generation signatures.'}
+                      </p>
+                    </div>
+
+                    {isSafeUrl && (
+                      <a
+                        href={src.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300 font-semibold self-start sm:self-center"
+                      >
+                        <span>Read Report</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 text-xs space-y-1">
+                <div className="flex items-center gap-2 text-slate-300 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-amber-400" />
+                  <span>No verified fact-check source found</span>
+                </div>
+                <p className="text-slate-500 text-[11px] leading-relaxed">
+                  No independent third-party fact-checker report has cataloged this specific media file in public registries. Evaluation is calculated directly from biometric, spectral, and error level forensics.
+                </p>
               </div>
-            ))}
+            )}
           </div>
 
         </div>
