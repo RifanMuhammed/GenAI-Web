@@ -1,8 +1,9 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { validateFactCheckSource } = require('../security');
 
 // Local Fallback Claim Verifier (Honest heuristics without fabricating third-party fact-checker reports)
 function verifyClaimFallback({ claimText, geminiError = null }) {
-  const text = claimText.toLowerCase();
+  const text = (claimText || '').toLowerCase();
 
   // Known viral hoaxes vs established public history patterns
   const isKnownHoax = /(explosion near pentagon|pope in white puffer|drinking bleach|cure.*cancer.*lemon|alien invasion white house|secret bank leak 2026)/i.test(text);
@@ -54,9 +55,9 @@ function verifyClaimFallback({ claimText, geminiError = null }) {
   };
 }
 
-// Google Gemini Multimodal / Text Fact-Checking Engine
-async function verifyClaim({ claimText, apiKey }) {
-  const keyToUse = apiKey || process.env.GEMINI_API_KEY;
+// Google Gemini Multimodal / Text Fact-Checking Engine (Server-Only Key)
+async function verifyClaim({ claimText }) {
+  const keyToUse = process.env.GEMINI_API_KEY;
 
   if (keyToUse && claimText && claimText.trim().length > 0) {
     try {
@@ -102,7 +103,8 @@ Respond with STRICT JSON ONLY. Do not wrap in markdown or backticks:
     {
       "name": "<Documented Organization e.g. Associated Press or Reuters or WHO>",
       "status": "<VERIFIED_TRUE or DEBUNKED_FALSE or MISLEADING>",
-      "claim": "<1-sentence summary of what the official report documented>"
+      "claim": "<1-sentence summary of what the official report documented>",
+      "url": "<optional real URL if verified published article exists>"
     }
   ]
 }`;
@@ -144,6 +146,17 @@ Respond with STRICT JSON ONLY. Do not wrap in markdown or backticks:
         const authenticityScore = Math.min(100, Math.max(0, Math.round(parsed.authenticityScore || 50)));
         const isSynthetic = authenticityScore < 50;
 
+        // Server-Side Strict Fact-Check Source Verification (Reject hallucinations & unaccredited URLs)
+        const validatedSources = [];
+        if (Array.isArray(parsed.factCheckSources)) {
+          for (const rawSrc of parsed.factCheckSources) {
+            const verified = validateFactCheckSource(rawSrc);
+            if (verified) {
+              validatedSources.push(verified);
+            }
+          }
+        }
+
         return {
           id: 'claim-' + Date.now().toString(36),
           timestamp: new Date().toISOString(),
@@ -157,14 +170,14 @@ Respond with STRICT JSON ONLY. Do not wrap in markdown or backticks:
           engineUsed: `Google Gemini Fact-Check Engine (${usedModelName})`,
           citizenSummary: parsed.citizenSummary || 'Evaluation completed based on indexed public record archives.',
           sharingGuidance: parsed.sharingGuidance || (isSynthetic ? '🚫 DO NOT SHARE: False or uncorroborated claim.' : '✅ SAFE TO SHARE: Verified fact.'),
-          redFlags: parsed.keyFacts || [],
+          redFlags: Array.isArray(parsed.keyFacts) ? parsed.keyFacts.map(k => String(k).slice(0, 200)) : [],
           provenance: {
             reverseMatches: isSynthetic ? 1840 : 42,
             earliestAppearance: isSynthetic ? 'Viral Disinformation Stream' : 'Accredited News & Historical Wire',
             c2paManifestFound: !isSynthetic,
             trustIndex: authenticityScore,
             socialSpreadRisk: isSynthetic ? 'HIGH_MISINFORMATION_RISK' : 'VERIFIED_SAFE_TO_CITE',
-            factCheckSources: Array.isArray(parsed.factCheckSources) ? parsed.factCheckSources : []
+            factCheckSources: validatedSources
           }
         };
       }

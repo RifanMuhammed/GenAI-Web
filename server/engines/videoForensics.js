@@ -151,8 +151,8 @@ async function analyzeVideoFallback({ filename = '', originalName = '', filePath
 
 // Multimodal Video Analyzer (Google Gemini Vision with automatic local fallback)
 async function analyzeVideo(params) {
-  const { filePath, fileBuffer, mimeType = 'video/mp4', apiKey } = params;
-  const keyToUse = apiKey || process.env.GEMINI_API_KEY;
+  const { filePath, fileBuffer, mimeType = 'video/mp4' } = params;
+  const keyToUse = process.env.GEMINI_API_KEY;
 
   let buffer = fileBuffer;
   if (!buffer && filePath && fs.existsSync(filePath)) {

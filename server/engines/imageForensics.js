@@ -172,8 +172,8 @@ async function analyzeImageFallback({ filename = '', originalName = '', filePath
 
 // Primary Multimodal Analyzer (Gemini Vision with automatic fallback)
 async function analyzeImage(params) {
-  const { filePath, fileBuffer, mimeType = 'image/jpeg', apiKey } = params;
-  const keyToUse = apiKey || process.env.GEMINI_API_KEY;
+  const { filePath, fileBuffer, mimeType = 'image/jpeg' } = params;
+  const keyToUse = process.env.GEMINI_API_KEY;
 
   let buffer = fileBuffer;
   if (!buffer && filePath && fs.existsSync(filePath)) {

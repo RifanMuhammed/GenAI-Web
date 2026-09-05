@@ -497,12 +497,39 @@ function sanitizeFilename(name, maxLength = 180) {
   return clean || 'media-target';
 }
 
-// --- 4. Sliding-Window Rate Limiter Middleware ---
+// --- 4. Client IP Resolution & Distributed Rate Limiter ---
 
+/**
+ * Resolves trusted client IP in Vercel serverless or standard proxy environments.
+ */
+function getTrustedClientIp(req) {
+  if (!req) return '127.0.0.1';
+  // 1. Vercel serverless trusted header
+  if (req.headers && req.headers['x-vercel-forwarded-for']) {
+    return req.headers['x-vercel-forwarded-for'].split(',')[0].trim();
+  }
+  // 2. Real-IP header (e.g. NGINX / Cloudflare)
+  if (req.headers && req.headers['x-real-ip']) {
+    return req.headers['x-real-ip'].trim();
+  }
+  // 3. Standard X-Forwarded-For (leftmost IP)
+  if (req.headers && req.headers['x-forwarded-for']) {
+    return req.headers['x-forwarded-for'].split(',')[0].trim();
+  }
+  // 4. Direct socket connection fallback
+  return req.socket?.remoteAddress || req.connection?.remoteAddress || '127.0.0.1';
+}
+
+/**
+ * Multi-Tiered Rate Limiter supporting Upstash Redis REST (Serverless) + Memory Token Bucket Fallback.
+ */
 function createRateLimiter({ windowMs = 60000, maxRequests = 30, message = 'Rate limit exceeded. Please wait a moment before trying again.' }) {
   const ipHits = new Map();
+  const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const hasDistributedRedis = Boolean(redisUrl && redisToken);
 
-  // Periodic garbage collection every 3 minutes to prevent memory leaks
+  // Periodic in-memory garbage collection
   setInterval(() => {
     const now = Date.now();
     for (const [ip, data] of ipHits.entries()) {
@@ -512,10 +539,46 @@ function createRateLimiter({ windowMs = 60000, maxRequests = 30, message = 'Rate
     }
   }, 180000).unref();
 
-  return (req, res, next) => {
-    const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress || '127.0.0.1';
+  return async (req, res, next) => {
+    const ip = getTrustedClientIp(req);
     const now = Date.now();
 
+    // 1. Distributed Upstash Redis Rate Limiter if configured (Vercel Serverless)
+    if (hasDistributedRedis) {
+      try {
+        const key = `ratelimit:${ip}:${Math.floor(now / windowMs)}`;
+        const expireSeconds = Math.ceil(windowMs / 1000) * 2;
+        const response = await fetch(`${redisUrl}/pipeline`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${redisToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify([
+            ['INCR', key],
+            ['EXPIRE', key, expireSeconds]
+          ])
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const count = data[0]?.result || 1;
+          if (count > maxRequests) {
+            const retryAfterSec = Math.ceil(windowMs / 1000);
+            res.setHeader('Retry-After', retryAfterSec);
+            return res.status(429).json({
+              error: message,
+              retryAfterSeconds: retryAfterSec
+            });
+          }
+          return next();
+        }
+      } catch (redisErr) {
+        // Non-fatal: fallback seamlessly to in-memory rate limiter
+      }
+    }
+
+    // 2. Sliding-Window In-Memory Token Bucket Fallback
     let record = ipHits.get(ip);
     if (!record || now > record.resetTime) {
       record = { count: 1, resetTime: now + windowMs };
@@ -537,7 +600,101 @@ function createRateLimiter({ windowMs = 60000, maxRequests = 30, message = 'Rate
   };
 }
 
-// --- 5. Error Masking Utility ---
+// --- 5. Fact-Check Domain & Source Verification ---
+
+const ACCREDITED_FACT_CHECK_DOMAINS = [
+  'reuters.com',
+  'apnews.com',
+  'snopes.com',
+  'bbc.com',
+  'bbc.co.uk',
+  'factcheck.org',
+  'afp.com',
+  'factcheck.afp.com',
+  'who.int',
+  'politifact.com',
+  'fullfact.org',
+  'leadstories.com',
+  'checkyourfact.com',
+  'usatoday.com',
+  'washingtonpost.com',
+  'nytimes.com'
+];
+
+const ACCREDITED_ORGANIZATION_NAMES = [
+  'reuters',
+  'ap',
+  'associated press',
+  'snopes',
+  'bbc',
+  'afp',
+  'agence france-presse',
+  'factcheck.org',
+  'factcheck',
+  'who',
+  'world health organization',
+  'politifact',
+  'full fact',
+  'fullfact',
+  'lead stories',
+  'leadstories',
+  'check your fact',
+  'checkyourfact',
+  'usa today',
+  'washington post',
+  'new york times'
+];
+
+function validateFactCheckSource(source) {
+  if (!source || typeof source !== 'object') return null;
+  const name = sanitizeClaimText(source.name || '', 100);
+  const status = sanitizeClaimText(source.status || 'UNVERIFIED', 50);
+  const claim = sanitizeClaimText(source.claim || '', 300);
+  const rawUrl = source.url && typeof source.url === 'string' ? source.url.trim() : null;
+
+  if (!name) return null;
+
+  const normalizedName = name.toLowerCase();
+  const isAccreditedOrg = ACCREDITED_ORGANIZATION_NAMES.some(org => 
+    normalizedName.includes(org) || org.includes(normalizedName)
+  );
+
+  let verifiedUrl = null;
+  let isAccreditedDomain = false;
+
+  if (rawUrl) {
+    try {
+      const parsed = new URL(rawUrl);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        const host = parsed.hostname.toLowerCase();
+        isAccreditedDomain = ACCREDITED_FACT_CHECK_DOMAINS.some(domain => 
+          host === domain || host.endsWith('.' + domain)
+        );
+        // Ensure destination is an accredited domain and not a private/internal IP
+        if (isAccreditedDomain && !isPrivateOrInternalIP(host)) {
+          verifiedUrl = parsed.toString();
+        }
+      }
+    } catch {
+      verifiedUrl = null;
+    }
+  }
+
+  // Reject hallucinated sources that are neither accredited organizations nor have accredited URLs
+  if (!isAccreditedOrg && !isAccreditedDomain) {
+    return null;
+  }
+
+  return {
+    name,
+    status,
+    claim: claim || 'Documented report cataloged in public registry.',
+    url: verifiedUrl,
+    isVerifiedDomain: Boolean(verifiedUrl)
+  };
+}
+
+// --- 6. Error Masking Utility ---
 
 function maskError(err, context = 'Forensic Engine') {
   const correlationId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
@@ -559,10 +716,13 @@ module.exports = {
   validateUpload,
   sanitizeClaimText,
   sanitizeFilename,
+  getTrustedClientIp,
   createRateLimiter,
+  validateFactCheckSource,
   maskError,
   ALLOWED_MIME_TYPES,
   ALLOWED_EXTENSIONS,
+  ACCREDITED_FACT_CHECK_DOMAINS,
   MAX_FILE_SIZE_BYTES,
   MAX_URL_FETCH_SIZE_BYTES
 };
