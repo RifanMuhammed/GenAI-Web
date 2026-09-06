@@ -9,45 +9,32 @@ import CitizenVerdictView from './components/CitizenVerdictView';
 import ForensicDeepDiveView from './components/ForensicDeepDiveView';
 import ProvenanceTimeline from './components/ProvenanceTimeline';
 import ExportReportModal from './components/ExportReportModal';
+import { sampleCases, formatReportFromCase } from './data/sampleCases';
 
 export default function App() {
   const [userMode, setUserMode] = useState('citizen'); // 'citizen' | 'forensic'
-  const [cases, setCases] = useState([]);
-  const [activeCaseId, setActiveCaseId] = useState('case-pope-puffer');
-  const [currentReport, setCurrentReport] = useState(null);
+  const [cases, setCases] = useState(sampleCases);
+  const [activeCaseId, setActiveCaseId] = useState(sampleCases[0]?.id || 'case-pope-puffer');
+  const [currentReport, setCurrentReport] = useState(formatReportFromCase(sampleCases[0]));
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
 
-  // Fetch benchmark cases on initial mount
+  // Fetch benchmark cases on initial mount (with safe fallback)
   useEffect(() => {
     fetch('/api/cases')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then(data => {
-        setCases(data);
-        if (data.length > 0) {
-          const initial = data[0];
-          setActiveCaseId(initial.id);
-          setCurrentReport({
-            id: initial.id,
-            title: initial.title,
-            mediaType: initial.type,
-            mediaPreview: initial.mediaPreview,
-            sourceUrl: initial.sourceUrl,
-            detectedGenerator: initial.verdict.detectedGenerator || initial.modelUsed,
-            authenticityScore: initial.verdict.authenticityScore,
-            status: initial.verdict.status,
-            riskLevel: initial.verdict.riskLevel,
-            citizenSummary: initial.verdict.citizenSummary,
-            sharingGuidance: initial.verdict.authenticityScore < 45 ? '🚫 DO NOT SHARE: Viral AI Deepfake' : '✅ SAFE TO SHARE',
-            redFlags: initial.verdict.redFlags,
-            forensicMetrics: initial.verdict.forensicMetrics,
-            provenance: initial.verdict.provenance
-          });
+        if (Array.isArray(data) && data.length > 0) {
+          setCases(data);
         }
       })
       .catch(err => {
-        console.error('Failed to load benchmark cases:', err);
+        // Fallback already preloaded from bundled sampleCases
+        console.warn('API cases fetch notice (using bundled fallback):', err.message);
       });
   }, []);
 
@@ -56,24 +43,12 @@ export default function App() {
     setActiveCaseId(item.id);
     setIsLoading(true);
     setTimeout(() => {
-      setCurrentReport({
-        id: item.id,
-        title: item.title,
-        mediaType: item.type,
-        mediaPreview: item.mediaPreview,
-        sourceUrl: item.sourceUrl,
-        detectedGenerator: item.verdict.detectedGenerator || item.modelUsed,
-        authenticityScore: item.verdict.authenticityScore,
-        status: item.verdict.status,
-        riskLevel: item.verdict.riskLevel,
-        citizenSummary: item.verdict.citizenSummary,
-        sharingGuidance: item.verdict.authenticityScore < 45 ? '🚫 DO NOT SHARE: Viral AI Deepfake' : '✅ SAFE TO SHARE',
-        redFlags: item.verdict.redFlags,
-        forensicMetrics: item.verdict.forensicMetrics,
-        provenance: item.verdict.provenance
-      });
+      const formatted = formatReportFromCase(item);
+      if (formatted) {
+        setCurrentReport(formatted);
+      }
       setIsLoading(false);
-    }, 400);
+    }, 250);
   };
 
   const handleAnalyzeFile = async (file, type) => {
