@@ -8,7 +8,7 @@
 <div align="center">
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel%20Deployment-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://gen-ai-web-45it.vercel.app/)
-[![Tests](https://img.shields.io/badge/Security%20Tests-21%2F21%20Passing%20(100%25)-emerald?style=for-the-badge&logo=jest&logoColor=white)](server/test/forensics.test.js)
+[![Tests](https://img.shields.io/badge/Security%20Tests-28%2F28%20Passing%20(100%25)-emerald?style=for-the-badge&logo=jest&logoColor=white)](server/test/forensics.test.js)
 [![AI Engine](https://img.shields.io/badge/AI%20Engine-Google%20Gemini%20Multimodal-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
 [![Security](https://img.shields.io/badge/Security-Enterprise%20SSRF%20%26%20Magic--Bytes-purple?style=for-the-badge&logo=auth0&logoColor=white)](server/security.js)
 [![Standard](https://img.shields.io/badge/Standard-C2PA%20v1.3%20%7C%20IEEE--1857-orange?style=for-the-badge)](https://c2pa.org/)
@@ -152,10 +152,12 @@ ProofLens was engineered with strict **zero-trust** security principles:
 
 - **Server-Only API Keys**: Gemini API keys are strictly sourced from `process.env.GEMINI_API_KEY`. No client headers (`x-gemini-api-key`), query parameters, or client bundles have access to API keys.
 - **Strict CORS Policy**: Production frontend (`https://gen-ai-web-45it.vercel.app`), local development ports, and authorized Vercel preview environments are explicitly allowlisted. Wildcard `origin: true` is disabled.
-- **Distributed Rate Limiting & Spoofing Defense**: Integrates Upstash Redis REST pipeline rate limiting for multi-instance Vercel serverless scale with sliding-window in-memory fallback. `getTrustedClientIp()` guards against spoofed `X-Forwarded-For` headers.
-- **SSRF Shield & IP Filtering**: Blocks all private IPv4/IPv6 CIDRs (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), Carrier-Grade NAT (`100.64.0.0/10`), Link-Local / Cloud Metadata (`169.254.169.254`), Loopback (`127.0.0.1`, `::1`), and obfuscated decimal/hexadecimal IP representations.
+- **Hardened Client-IP Trust Boundary**: `getTrustedClientIp()` strictly verifies the server execution environment (`TRUSTED_PROXY_PLATFORM=vercel` or `VERCEL=1`) before trusting platform-forwarded headers, preventing client-side spoofing and header injection bypasses.
+- **Fail-Safe Distributed Rate Limiting**: Enforces Upstash Redis REST pipeline rate limiting for multi-instance Vercel serverless scale. In production, missing or failing Redis configurations fail safely with HTTP 503 rather than allowing uncoordinated in-memory rate limiting.
+- **Advanced SSRF Shield & IP Filtering**: Blocks all private IPv4/IPv6 CIDRs (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), Carrier-Grade NAT (`100.64.0.0/10`), Link-Local / Cloud Metadata (`169.254.169.254`), Loopback (`127.0.0.1`, `::1`), octal IPv4 notations (`0177.0.0.1`), dotted hexadecimal, documentation IPv6 prefixes (`2001:db8::`), and IPv4-mapped IPv6 addresses.
 - **Deep Magic-Byte Binary Verification**: Inspects raw binary header signatures for all media types (JPEG, PNG, WebP, GIF, MP3, WAV, OGG, MP4, WebM) to neutralize spoofed MIME types and disguised executables.
-- **Fact-Check Source Integrity**: Checks fact-checking sources against verified domains (`reuters.com`, `apnews.com`, `snopes.com`, `bbc.com`, `afp.com`, `who.int`, `factcheck.org`) and filters out AI hallucinations or unverified links.
+- **Fact-Check Source Integrity & Model Boundaries**: Validates fact-checking sources against verified domains (`reuters.com`, `apnews.com`, `snopes.com`, `bbc.com`, `afp.com`, `who.int`, `factcheck.org`). AI-generated candidate links are explicitly labeled as unverified candidates and cannot spoof independent verification flags.
+- **Safe Server-Side Logging**: Server exceptions are processed through `redactSensitiveLog()` to strip API keys, Bearer tokens, secrets, passwords, cookies, and internal server paths before logging, preventing credential exposure in cloud monitoring tools.
 - **Ephemeral Storage & Privacy**: Uploads are renamed with 128-bit cryptographic random IDs, deleted immediately after analysis, and swept by an automated garbage collector. Public static `/uploads` serving is disabled.
 - **Production HTTP Headers & Cache Control**: Enforces `Cache-Control: no-store` on all API routes along with Content-Security-Policy (CSP), COOP, CORP, HSTS, `X-Content-Type-Options: nosniff`, and `X-Frame-Options: DENY`.
 
@@ -208,7 +210,7 @@ veritas-lens/
 │   │   ├── provenanceEngine.js         # OSINT citation corroborator
 │   │   └── videoForensics.js           # Temporal coherence & lip-sync engine
 │   ├── test/
-│   │   └── forensics.test.js           # 17/17 Automated security & unit test suite
+│   │   └── forensics.test.js           # 28/28 Automated security & unit test suite
 │   ├── index.js                        # Express API, CORS, & security middleware
 │   ├── sampleCases.js                  # Real-world benchmark cases (SRK, Pope, etc.)
 │   ├── security.js                     # SSRF shield, magic-bytes, Upstash rate limiter
@@ -272,7 +274,7 @@ Visit **`http://localhost:5173`** in your browser to start analyzing media.
 
 ## 🧪 Automated Testing
 
-ProofLens includes an automated test suite verifying all forensic engines, SSRF protections, magic-byte checks, distributed rate limiters, client IP resolution, CORS allowlists, and fact-checking integrity:
+ProofLens includes an automated test suite verifying all forensic engines, SSRF protections, magic-byte checks, distributed rate limiters, client IP resolution, CORS allowlists, fact-checking integrity, secret isolation, and error log sanitization:
 
 ```bash
 $ node server/test/forensics.test.js
@@ -295,16 +297,23 @@ $ node server/test/forensics.test.js
   ✔ PASS Error Masking: Returns safe correlation IDs without revealing stack traces
   ✔ PASS Rate Limiting: Middleware enforces sliding-window threshold
   ✔ PASS CORS Policy: Rejects unauthorized origins while allowing verified domains
-  ✔ PASS Client IP Resolution: getTrustedClientIp prioritizes platform trusted headers
+  ✔ PASS Client IP Resolution: getTrustedClientIp enforces strict environment trust boundary and rejects injected headers
   ✔ PASS Fact-Checking Integrity: validateFactCheckSource filters unaccredited domains & SSRF URLs
   ✔ PASS Claim Verifier: Handles extremely long text and malicious injections gracefully
   ✔ PASS API Key Isolation: Guarantees server key exclusivity and zero response leakage
   ✔ PASS Filename Sanitization: Neutralizes encoded traversal and illegal symbols
   ✔ PASS AI Output Schema: Validates score boundaries and structure
   ✔ PASS Provenance Integrity: Distinguishes known benchmarks from uncataloged user uploads
+  ✔ PASS Security: Hardened trusted IP detection and IPv4/IPv6 normalization
+  ✔ PASS Security: Rate limiter fails safely with HTTP 503 if Redis missing in production
+  ✔ PASS Fact-Check Integrity: Labels AI candidate URLs as unverified candidates and rejects model-injected verification fields
+  ✔ PASS SSRF Defense: Blocks octal IPv4, dotted hex, documentation IPv6, and IPv4-mapped addresses
+  ✔ PASS Provenance Integrity: Arbitrary uploads never report fabricated C2PA or reverse search matches
+  ✔ PASS Live-Shield: /api/verify/live-frame returns explicit simulation flag and deterministic metrics
+  ✔ PASS Secrets: Errors mask internal details and never leak API keys or file paths
 
 ------------------------------------------------------------
-  📊 Test Summary: 21/21 Passed (100%)
+  📊 Test Summary: 28/28 Passed (100%)
 ============================================================
 ```
 
