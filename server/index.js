@@ -223,12 +223,9 @@ const liveShieldLimiter = createRateLimiter({
   message: 'Live shield frame rate limit exceeded.'
 });
 
-// Apply general limiter to all /api/ endpoints
-app.use('/api/', generalApiLimiter);
-
 // --- API Routes ---
 
-// Health & System Diagnostic Info
+// Health & System Diagnostic Info (Public diagnostic)
 app.get('/api/health', (req, res) => {
   const hasGeminiKey = Boolean(process.env.GEMINI_API_KEY);
   const hasRedis = Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
@@ -263,7 +260,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Benchmark Arsenal cases
+// Benchmark Arsenal cases (Public static metadata)
 app.get('/api/cases', (req, res) => {
   res.json(sampleCases);
 });
@@ -274,6 +271,9 @@ app.get('/api/cases/:id', (req, res) => {
   if (!item) return res.status(404).json({ error: 'Case not found' });
   res.json(item);
 });
+
+// Apply general limiter to all stateful / analysis / computation endpoints
+app.use('/api/', generalApiLimiter);
 
 // Unified response generator
 function buildUnifiedReport(baseAnalysis, filename, url, buffer = null) {

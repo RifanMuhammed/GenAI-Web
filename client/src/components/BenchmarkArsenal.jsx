@@ -2,7 +2,7 @@ import React from 'react';
 import { Sparkles, ImageIcon, Mic, Video, Flame } from 'lucide-react';
 
 export default function BenchmarkArsenal({ cases, onSelectCase, activeCaseId, isLoading }) {
-  if (!cases || cases.length === 0) return null;
+  if (!Array.isArray(cases) || cases.length === 0) return null;
 
   return (
     <div className="max-w-4xl mx-auto px-3 sm:px-4 mb-5">
