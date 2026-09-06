@@ -622,36 +622,24 @@ function createRateLimiter({ windowMs = 60000, maxRequests = 30, message = 'Rate
   const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
   const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
   const hasDistributedRedis = Boolean(redisUrl && redisToken);
+  const enforceStrictRedis = process.env.ENFORCE_DISTRIBUTED_REDIS === 'true';
 
-  // Distinguish production deployment vs development/test
-  const isProduction = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL) || process.env.VERCEL_ENV === 'production';
-  const isTestOrDev = process.env.NODE_ENV === 'test' || (!isProduction && process.env.NODE_ENV !== 'production');
-
-  // Periodic in-memory garbage collection for dev/test fallback
-  if (isTestOrDev) {
-    setInterval(() => {
-      const now = Date.now();
-      for (const [ip, data] of ipHits.entries()) {
-        if (now - data.resetTime > windowMs) {
-          ipHits.delete(ip);
-        }
+  // Periodic in-memory garbage collection
+  setInterval(() => {
+    const now = Date.now();
+    for (const [ip, data] of ipHits.entries()) {
+      if (now - data.resetTime > windowMs) {
+        ipHits.delete(ip);
       }
-    }, 180000).unref();
-  }
+    }
+  }, 180000).unref();
 
   return async (req, res, next) => {
     const ip = getTrustedClientIp(req);
     const now = Date.now();
 
-    // 1. Production / Vercel Environment MUST enforce Upstash Redis (No silent in-memory fallback)
-    if (isProduction && !isTestOrDev) {
-      if (!hasDistributedRedis) {
-        console.error('[RateLimiter Configuration Error] UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required in production.');
-        return res.status(503).json({
-          error: 'Rate limiting service is not properly configured for production. UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required.'
-        });
-      }
-
+    // 1. If Distributed Upstash Redis is configured, execute distributed pipeline
+    if (hasDistributedRedis) {
       try {
         const key = `ratelimit:${ip}:${Math.floor(now / windowMs)}`;
         const expireSeconds = Math.ceil(windowMs / 1000) * 2;
@@ -680,20 +668,29 @@ function createRateLimiter({ windowMs = 60000, maxRequests = 30, message = 'Rate
           }
           return next();
         } else {
-          console.error(`[RateLimiter Error] Upstash Redis returned HTTP ${response.status}`);
+          console.warn(`[RateLimiter Notice] Upstash Redis returned HTTP ${response.status}, falling back to instance limiter.`);
+          if (enforceStrictRedis) {
+            return res.status(503).json({
+              error: 'Rate limiting service temporarily unavailable. Please try again shortly.'
+            });
+          }
+        }
+      } catch (redisErr) {
+        console.warn('[RateLimiter Notice] Upstash Redis connection failed, falling back to instance limiter:', redisErr.message);
+        if (enforceStrictRedis) {
           return res.status(503).json({
             error: 'Rate limiting service temporarily unavailable. Please try again shortly.'
           });
         }
-      } catch (redisErr) {
-        console.error('[RateLimiter Error] Upstash Redis connection failed:', redisErr.message);
-        return res.status(503).json({
-          error: 'Rate limiting service temporarily unavailable. Please try again shortly.'
-        });
       }
+    } else if (enforceStrictRedis) {
+      console.error('[RateLimiter Configuration Error] UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required.');
+      return res.status(503).json({
+        error: 'Rate limiting service is not properly configured for production. UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required.'
+      });
     }
 
-    // 2. Development & Test Fallback: In-Memory Sliding-Window Token Bucket
+    // 2. Sliding-Window Token Bucket Limiter (Instance-level fallback)
     let record = ipHits.get(ip);
     if (!record || now > record.resetTime) {
       record = { count: 1, resetTime: now + windowMs };
