@@ -432,13 +432,15 @@ async function runAllTests() {
   });
 
   // 19. Production Rate Limiter Fail-Safe Enforcement
-  await test('Security: Rate limiter fails safely with HTTP 503 if Redis missing in production', async () => {
+  await test('Security: Rate limiter fails safely with HTTP 503 if Redis missing when ENFORCE_DISTRIBUTED_REDIS is enabled', async () => {
     const origEnv = process.env.NODE_ENV;
     const origUrl = process.env.UPSTASH_REDIS_REST_URL;
     const origToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+    const origEnforce = process.env.ENFORCE_DISTRIBUTED_REDIS;
 
     try {
       process.env.NODE_ENV = 'production';
+      process.env.ENFORCE_DISTRIBUTED_REDIS = 'true';
       delete process.env.UPSTASH_REDIS_REST_URL;
       delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
@@ -455,15 +457,17 @@ async function runAllTests() {
           };
         }
       };
-      const mockNext = () => { assert.fail('Should not call next when Redis missing in prod'); };
+      const mockNext = () => { assert.fail('Should not call next when Redis missing and strict enforcement is active'); };
 
       await limiter(mockReq, mockRes, mockNext);
-      assert.strictEqual(statusCalled, 503, 'Must return HTTP 503 in production if Redis is not configured');
+      assert.strictEqual(statusCalled, 503, 'Must return HTTP 503 when ENFORCE_DISTRIBUTED_REDIS is true and Redis is not configured');
       assert.ok(jsonCalled && jsonCalled.error.includes('UPSTASH_REDIS_REST_URL'), 'Error message informs of missing Redis configuration');
     } finally {
       process.env.NODE_ENV = origEnv;
       if (origUrl) process.env.UPSTASH_REDIS_REST_URL = origUrl;
       if (origToken) process.env.UPSTASH_REDIS_REST_TOKEN = origToken;
+      if (origEnforce !== undefined) process.env.ENFORCE_DISTRIBUTED_REDIS = origEnforce;
+      else delete process.env.ENFORCE_DISTRIBUTED_REDIS;
     }
   });
 

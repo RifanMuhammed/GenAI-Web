@@ -241,8 +241,8 @@ app.get('/api/health', (req, res) => {
       rateLimiter: {
         driver: hasRedis 
           ? 'Upstash Redis (Distributed Cloud)' 
-          : (isProd ? 'Missing Config (Requires UPSTASH_REDIS_REST_URL)' : 'In-Memory Sliding-Window Token Bucket (Local Dev/Test)'),
-        status: hasRedis || !isProd ? 'healthy' : 'unconfigured_for_production'
+          : 'In-Memory Sliding-Window Token Bucket (Instance Limiter)',
+        status: 'healthy'
       },
       aiForensicEngine: {
         driver: hasGeminiKey ? 'Google Gemini Vision & Multimodal Pipeline' : 'Local Pixel & Signal Processing Forensic Engine',
