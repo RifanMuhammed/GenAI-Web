@@ -98,10 +98,27 @@ export default function CitizenVerdictView({ report, onSwitchToForensics, onOpen
                   <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 text-lg">🎙️</div>
                   <span>Voice Audio Track</span>
                 </div>
-              ) : report.mediaType === 'video' ? (
-                <video src={report.mediaPreview} className="w-full h-full object-cover" muted autoPlay loop />
+              ) : report.mediaType === 'video' && report.mediaPreview && (report.mediaPreview.endsWith('.mp4') || report.mediaPreview.endsWith('.webm') || (typeof report.mediaPreview === 'string' && report.mediaPreview.startsWith('blob:') && !report.mediaPreview.includes('image'))) ? (
+                <video src={report.mediaPreview} className="w-full h-full object-cover" muted autoPlay loop playsInline />
               ) : (
-                <img src={report.mediaPreview} alt="Media preview" className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300" />
+                <div className="relative w-full h-full flex items-center justify-center">
+                  <img 
+                    src={report.mediaPreview} 
+                    alt="Media preview" 
+                    className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300" 
+                    onError={(e) => {
+                      if (!e.target.dataset.fallback) {
+                        e.target.dataset.fallback = 'true';
+                        e.target.src = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2338BDF8' stroke-width='1.5'><rect width='18' height='18' x='3' y='3' rx='2'/><circle cx='9' cy='9' r='2'/><path d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/></svg>";
+                      }
+                    }}
+                  />
+                  {report.mediaType === 'video' && (
+                    <div className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded-md bg-slate-950/80 border border-slate-700/80 text-[9px] font-mono text-emerald-300 flex items-center gap-1 shadow-sm backdrop-blur-sm">
+                      <span>🎬 Video Frame</span>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           ) : report.mediaType === 'text_claim' ? (
