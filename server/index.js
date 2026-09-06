@@ -43,11 +43,9 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(self), microphone=(self), geolocation=()');
   res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-  res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' http://localhost:* ws://localhost:* https://*.vercel.app https://*.googleapis.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+    "default-src 'self' https: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https:; font-src 'self' https://fonts.gstatic.com data: https:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' https: wss: ws: http://localhost:* ws://localhost:*; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
   );
   // Prevent caching of sensitive analysis API responses
   if (req.path.startsWith('/api/')) {
@@ -89,10 +87,11 @@ const isOriginAllowed = (origin, callback) => {
     return callback(null, true);
   }
 
-  // Controlled Vercel preview domain pattern matching (preventing wildcard origin: true)
-  const vercelPreviewPattern = /^https:\/\/([a-zA-Z0-9_-]+-)?gen-ai-web(-[a-zA-Z0-9_-]+)?\.vercel\.app$/;
-  const vercelUserPattern = /^https:\/\/.*-rifanmuhammed.*\.vercel\.app$/;
-  if (vercelPreviewPattern.test(origin) || vercelUserPattern.test(origin)) {
+  // Allow all Vercel domains (*.vercel.app) and local development ports
+  const isVercelDomain = /^https:\/\/([a-zA-Z0-9_-]+\.)*vercel\.app$/.test(origin);
+  const isLocalDomain = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+
+  if (isVercelDomain || isLocalDomain) {
     return callback(null, true);
   }
 
