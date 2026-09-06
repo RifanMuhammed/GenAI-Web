@@ -71,14 +71,14 @@ async function analyzeVideoFallback({ filename = '', originalName = '', filePath
     : 'Local Video Temporal & Codec Engine';
 
   if (isAuthentic) {
-    authenticityScore = 91 + Math.floor(Math.random() * 6); // 91% - 96%
+    authenticityScore = 94;
     status = 'VERIFIED_AUTHENTIC';
     riskLevel = 'LOW';
     detectedGenerator = 'None (Genuine Optical Camera / Broadcast Video Stream)';
-    temporalInconsistencyScore = 4 + Math.floor(Math.random() * 4);
-    lipSyncMismatchIndex = 3 + Math.floor(Math.random() * 4);
-    facialBoundaryJitter = 4 + Math.floor(Math.random() * 3);
-    blinkRateAnomalyScore = 5 + Math.floor(Math.random() * 4);
+    temporalInconsistencyScore = 5;
+    lipSyncMismatchIndex = 4;
+    facialBoundaryJitter = 4;
+    blinkRateAnomalyScore = 5;
 
     timelineFrames.push(
       { timestamp: '00:02.0', riskScore: 4, note: 'Optical motion coherence verified across keyframes' },
@@ -99,21 +99,21 @@ async function analyzeVideoFallback({ filename = '', originalName = '', filePath
         facialBoundaryJitter,
         blinkRateAnomalyScore,
         frameRateConsistency: 99.2,
-        c2paProvenance: 'AUTHENTICATED_STREAM_SIGNATURE'
+        c2paProvenance: 'NO_HARDWARE_SIGNATURE_EMBEDDED'
       },
       timelineFrames,
       redFlags: [],
       citizenSummary: 'This video is an authentic real-world optical camera recording. Motion physics, lighting vectors, and frame-to-frame continuity exhibit natural camera sensor capture with zero deepfake anomalies.'
     };
   } else {
-    authenticityScore = 8 + Math.floor(Math.random() * 8); // 8% - 15%
+    authenticityScore = 9;
     status = 'SYNTHETIC_MANIPULATED';
     riskLevel = 'CRITICAL';
     detectedGenerator = detectedGeneratorName;
-    temporalInconsistencyScore = 88 + Math.floor(Math.random() * 8);
-    lipSyncMismatchIndex = 84 + Math.floor(Math.random() * 8);
-    facialBoundaryJitter = 92 + Math.floor(Math.random() * 6);
-    blinkRateAnomalyScore = 86 + Math.floor(Math.random() * 7);
+    temporalInconsistencyScore = 91;
+    lipSyncMismatchIndex = 86;
+    facialBoundaryJitter = 93;
+    blinkRateAnomalyScore = 88;
 
     redFlags.push('Temporal flickering and latent morphing detected along boundary contours between keyframes.');
     redFlags.push('Audio-visual phoneme-viseme desynchronization: mouth motion fails natural acoustic closure.');

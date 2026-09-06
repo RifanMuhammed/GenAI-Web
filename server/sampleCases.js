@@ -2,6 +2,7 @@
 module.exports = [
   {
     id: 'case-pope-puffer',
+    isBenchmark: true,
     type: 'image',
     title: 'Pope Francis in Balenciaga Puffer Coat',
     category: 'Viral AI Diffusion',
@@ -26,22 +27,37 @@ module.exports = [
         noisePatternVariance: 79,
         anatomicalAnomalyIndex: 94,
         frequencyCutoffScore: 83,
-        c2paProvenance: 'NO_AUTHENTIC_SIGNATURE',
+        c2paProvenance: 'NO_C2PA_MANIFEST',
         detectedGenerator: 'Midjourney Diffusion Latent v5.1'
       },
       provenance: {
         firstSeen: 'March 24, 2023 (Reddit r/midjourney by Pablo Xavier)',
-        reverseMatches: 1420,
+        reverseMatches: null, // Live crawling requires commercial API subscription
+        historicalSightings: 1420,
+        isBenchmark: true,
+        evidenceType: 'Benchmark Reference Case Evidence (Historical Incident Documentation)',
         factCheckSources: [
-          { name: 'Reuters Fact Check', url: 'https://reuters.com/fact-check', status: 'DEBUNKED' },
-          { name: 'Snopes', url: 'https://snopes.com', status: 'FALSE' },
-          { name: 'AFP FactCheck', url: 'https://factcheck.afp.com', status: 'SYNTHETIC' }
+          { 
+            name: 'Reuters Fact Check Digital Desk', 
+            url: 'https://www.reuters.com/fact-check/pope-francis-white-puffer-jacket-image-is-ai-generated-2023-03-27/', 
+            status: 'VERIFIED_SYNTHETIC',
+            isBenchmark: true,
+            verificationNote: 'Benchmark reference evidence (historical incident documentation).'
+          },
+          { 
+            name: 'Snopes Digital Forensics', 
+            url: 'https://www.snopes.com/fact-check/pope-francis-white-puffer-jacket-ai/', 
+            status: 'AI_FABRICATED_IMAGE',
+            isBenchmark: true,
+            verificationNote: 'Benchmark reference evidence (historical incident documentation).'
+          }
         ]
       }
     }
   },
   {
     id: 'case-pentagon-explosion',
+    isBenchmark: true,
     type: 'image',
     title: 'Pentagon Complex Fire & Explosion Hoax',
     category: 'Market Manipulation Disinformation',
@@ -66,21 +82,37 @@ module.exports = [
         noisePatternVariance: 85,
         anatomicalAnomalyIndex: 70,
         frequencyCutoffScore: 89,
-        c2paProvenance: 'SUSPICIOUS_UNVERIFIED',
+        c2paProvenance: 'NO_C2PA_MANIFEST',
         detectedGenerator: 'Diffusion-based Generative Inpainting'
       },
       provenance: {
         firstSeen: 'May 22, 2023 (Verified-check spoofed Twitter accounts)',
-        reverseMatches: 890,
+        reverseMatches: null,
+        historicalSightings: 890,
+        isBenchmark: true,
+        evidenceType: 'Benchmark Reference Case Evidence (Historical Incident Documentation)',
         factCheckSources: [
-          { name: 'Associated Press (AP)', url: 'https://apnews.com', status: 'DEBUNKED' },
-          { name: 'Arlington Fire Dept', url: 'https://twitter.com', status: 'OFFICIALLY_DENIED' }
+          { 
+            name: 'Associated Press (AP News)', 
+            url: 'https://apnews.com/article/pentagon-explosion-misinformation-ai-generated-7b435ee172ae37a28e7e1f40d331cfd0', 
+            status: 'DEBUNKED_HOAX',
+            isBenchmark: true,
+            verificationNote: 'Benchmark reference evidence (historical incident documentation).'
+          },
+          { 
+            name: 'Reuters Fact Check Desk', 
+            url: 'https://www.reuters.com/fact-check/fabricated-image-explosion-near-pentagon-sparks-brief-us-stock-sell-off-2023-05-22/', 
+            status: 'DEBUNKED_SYNTHETIC_IMAGE',
+            isBenchmark: true,
+            verificationNote: 'Benchmark reference evidence (historical incident documentation).'
+          }
         ]
       }
     }
   },
   {
     id: 'case-ceo-voice-clone',
+    isBenchmark: true,
     type: 'audio',
     title: 'CEO Emergency Wire Transfer Voice Clone',
     category: 'AI Voice Cloning / Audio Deepfake',
@@ -105,20 +137,29 @@ module.exports = [
         pitchJitterVariance: 0.04,
         syntheticBreathingAbsence: 96,
         phaseIncoherenceScore: 91,
-        c2paProvenance: 'NO_AUDIO_WATERMARK',
+        c2paProvenance: 'NO_C2PA_MANIFEST',
         detectedGenerator: 'ElevenLabs Multilingual v2 Neural Vocoder'
       },
       provenance: {
         firstSeen: 'Internal Corporate Phishing Incident Report',
-        reverseMatches: 0,
+        reverseMatches: null,
+        isBenchmark: true,
+        evidenceType: 'Benchmark Reference Case Evidence (Synthetic Audio Phonation Control)',
         factCheckSources: [
-          { name: 'DeepTrace Audio Forensics', url: '#', status: 'SYNTHETIC_VOICE_CLONE' }
+          { 
+            name: 'Audio Forensics Reference Dataset', 
+            url: null, 
+            status: 'BENCHMARK_DEMO_CASE',
+            isBenchmark: true,
+            verificationNote: 'Benchmark reference dataset sample — simulated synthetic voice.'
+          }
         ]
       }
     }
   },
   {
     id: 'case-politician-video-swap',
+    isBenchmark: true,
     type: 'video',
     title: 'State Official Fabricated Concession Speech',
     category: 'Video Deepfake / Lip-Sync Manipulation',
@@ -143,21 +184,29 @@ module.exports = [
         lipSyncMismatchIndex: 86,
         facialBoundaryJitter: 92,
         blinkRateAnomalyScore: 84,
-        c2paProvenance: 'TAMPERED_MEDIA_STREAM',
+        c2paProvenance: 'NO_C2PA_MANIFEST',
         detectedGenerator: 'Latent Face-Swap + Wav2Lip Neural Sync'
       },
       provenance: {
-        firstSeen: 'August 14, 2024 (Telegram propaganda channel)',
-        reverseMatches: 312,
+        firstSeen: 'August 14, 2024 (Telegram propaganda channel archive)',
+        reverseMatches: null,
+        isBenchmark: true,
+        evidenceType: 'Benchmark Reference Case Evidence (Temporal Video Manipulation Control)',
         factCheckSources: [
-          { name: 'BBC Verify', url: 'https://bbc.com/news/reality_check', status: 'DEEPFAKE_CONFIRMED' },
-          { name: 'PolitiFact', url: 'https://politifact.com', status: 'PANTS_ON_FIRE' }
+          { 
+            name: 'BBC Verify (Reference Dataset Archive)', 
+            url: null, 
+            status: 'BENCHMARK_REFERENCE_CASE',
+            isBenchmark: true,
+            verificationNote: 'Benchmark reference dataset for video lip-sync manipulation.'
+          }
         ]
       }
     }
   },
   {
     id: 'case-authentic-press-photo',
+    isBenchmark: true,
     type: 'image',
     title: 'Authentic Photojournalism: Olympic Sprint Finish',
     category: 'Verified Genuine Media (Control Case)',
@@ -170,28 +219,36 @@ module.exports = [
       label: 'Verified Authentic Capture',
       authenticityScore: 97, // 97% authentic
       riskLevel: 'LOW',
-      citizenSummary: 'This media passes all cryptographic, optical, and physical coherence checks. Natural optical depth-of-field blur, consistent Bayer pattern camera sensor noise, and valid camera EXIF metadata are present.',
+      citizenSummary: 'This media passes all optical and physical coherence checks. Natural optical depth-of-field blur, consistent Bayer pattern camera sensor noise, and authentic focal distribution are present.',
       redFlags: [],
       forensicMetrics: {
         elaDiscrepancy: 6,
         noisePatternVariance: 8,
         anatomicalAnomalyIndex: 3,
         frequencyCutoffScore: 5,
-        c2paProvenance: 'VALID_HARDWARE_SIGNATURE (Sony Alpha 1 / 50mm f/1.2)',
+        c2paProvenance: 'NO_C2PA_MANIFEST (Optical Photojournalism Control)',
         detectedGenerator: 'None (Pure Optical Sensor Data)'
       },
       provenance: {
         firstSeen: 'Official Olympic Newsroom Archive / Getty Images',
-        reverseMatches: 620,
+        reverseMatches: null,
+        isBenchmark: true,
+        evidenceType: 'Benchmark Reference Case Evidence (Authentic Optical Control)',
         factCheckSources: [
-          { name: 'Reuters Newsroom', url: 'https://reuters.com', status: 'VERIFIED_GENUINE' },
-          { name: 'Associated Press Photo Registry', url: 'https://ap.org', status: 'AUTHENTIC' }
+          { 
+            name: 'Photojournalism Sensor Control Archive', 
+            url: null, 
+            status: 'BENCHMARK_CONTROL_SAMPLE',
+            isBenchmark: true,
+            verificationNote: 'Control sample: authentic camera optical sensor capture.'
+          }
         ]
       }
     }
   },
   {
     id: 'case-authentic-podcast-audio',
+    isBenchmark: true,
     type: 'audio',
     title: 'Studio Interview: Natural Human Speech',
     category: 'Verified Genuine Audio (Control Case)',
@@ -211,14 +268,22 @@ module.exports = [
         pitchJitterVariance: 1.15,
         syntheticBreathingAbsence: 4,
         phaseIncoherenceScore: 7,
-        c2paProvenance: 'VALID_AUDIO_INTERFACE_SIGNATURE (Shure SM7B / Focusrite)',
+        c2paProvenance: 'NO_C2PA_MANIFEST (Acoustic Studio Control)',
         detectedGenerator: 'None (Organic Human Phonation)'
       },
       provenance: {
         firstSeen: 'Verified Public Podcast Stream (NPR Studio)',
-        reverseMatches: 45,
+        reverseMatches: null,
+        isBenchmark: true,
+        evidenceType: 'Benchmark Reference Case Evidence (Authentic Acoustic Control)',
         factCheckSources: [
-          { name: 'Audio Forensics Lab', url: '#', status: 'VERIFIED_AUTHENTIC_SPEECH' }
+          { 
+            name: 'Acoustic Forensics Studio Control', 
+            url: null, 
+            status: 'BENCHMARK_CONTROL_SAMPLE',
+            isBenchmark: true,
+            verificationNote: 'Control sample: studio acoustic recording with full dynamic range.'
+          }
         ]
       }
     }
