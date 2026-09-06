@@ -36,10 +36,10 @@
   --border-glow: rgba(56, 189, 248, 0.35);
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
 }
 
 body {

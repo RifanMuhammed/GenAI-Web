@@ -6,8 +6,8 @@ module.exports = [
     type: 'image',
     title: 'Pope Francis in Balenciaga Puffer Coat',
     category: 'Viral AI Diffusion',
-    sourceUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=800&q=80',
-    mediaPreview: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=800&q=80',
+    sourceUrl: '/benchmarks/pope-puffer.jpg',
+    mediaPreview: '/benchmarks/pope-puffer.jpg',
     description: 'The infamous viral image showing Pope Francis walking the streets of Rome wearing a lavish white designer puffer coat with crucifix chain.',
     modelUsed: 'Midjourney v5',
     verdict: {
@@ -61,8 +61,8 @@ module.exports = [
     type: 'image',
     title: 'Pentagon Complex Fire & Explosion Hoax',
     category: 'Market Manipulation Disinformation',
-    sourceUrl: 'https://images.unsplash.com/photo-1508847154043-be5407fcaa5a?auto=format&fit=crop&w=800&q=80',
-    mediaPreview: 'https://images.unsplash.com/photo-1508847154043-be5407fcaa5a?auto=format&fit=crop&w=800&q=80',
+    sourceUrl: '/benchmarks/pentagon-hoax.jpg',
+    mediaPreview: '/benchmarks/pentagon-hoax.jpg',
     description: 'A fabricated image depicting thick black smoke billowing near the Pentagon that caused a momentary $500B drop in the S&P 500 stock index.',
     modelUsed: 'Stable Diffusion / Midjourney Hybrid',
     verdict: {
@@ -117,7 +117,7 @@ module.exports = [
     title: 'CEO Emergency Wire Transfer Voice Clone',
     category: 'AI Voice Cloning / Audio Deepfake',
     sourceUrl: 'https://actions.google.com/sounds/v1/emergency/emergency_siren_short.ogg',
-    mediaPreview: 'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&w=800&q=80',
+    mediaPreview: '/benchmarks/ceo-voice.jpg',
     description: 'A 24-second synthetic audio recording mimicking a company CEO demanding an urgent financial transaction over WhatsApp voice note.',
     modelUsed: 'ElevenLabs Voice Engine / Tortoise TTS',
     verdict: {
@@ -164,7 +164,7 @@ module.exports = [
     title: 'State Official Fabricated Concession Speech',
     category: 'Video Deepfake / Lip-Sync Manipulation',
     sourceUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    mediaPreview: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=800&q=80',
+    mediaPreview: '/benchmarks/politician-speech.jpg',
     description: 'A fabricated 15-second high-resolution video of a senior public official making inflammatory policy statements never spoken.',
     modelUsed: 'Wav2Lip + SimSwap Deepfake Pipeline',
     verdict: {
@@ -210,8 +210,8 @@ module.exports = [
     type: 'image',
     title: 'Authentic Photojournalism: Olympic Sprint Finish',
     category: 'Verified Genuine Media (Control Case)',
-    sourceUrl: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=800&q=80',
-    mediaPreview: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=800&q=80',
+    sourceUrl: '/benchmarks/olympic-sprint.jpg',
+    mediaPreview: '/benchmarks/olympic-sprint.jpg',
     description: 'Certified authentic raw press photograph captured during a major track and field championship.',
     modelUsed: 'None (Genuine Camera Capture)',
     verdict: {
@@ -253,7 +253,7 @@ module.exports = [
     title: 'Studio Interview: Natural Human Speech',
     category: 'Verified Genuine Audio (Control Case)',
     sourceUrl: 'https://actions.google.com/sounds/v1/ambiences/coffee_shop.ogg',
-    mediaPreview: 'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?auto=format&fit=crop&w=800&q=80',
+    mediaPreview: '/benchmarks/podcast-studio.jpg',
     description: 'Direct high-fidelity studio recording with full 48kHz acoustic bandwidth and natural human vocal tract dynamics.',
     modelUsed: 'None (Natural Human Vocal Cord Phonation)',
     verdict: {
