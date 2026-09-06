@@ -21,44 +21,54 @@ export default function ForensicDeepDiveView({ report, onOpenExportModal }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    if (!ctx) return;
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    if (typeof report.mediaPreview === 'string' && report.mediaPreview.startsWith('http')) {
+      img.crossOrigin = 'anonymous';
+    }
     img.src = report.mediaPreview;
 
     img.onload = () => {
-      canvas.width = img.width || 600;
-      canvas.height = img.height || 400;
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      try {
+        canvas.width = img.width || 600;
+        canvas.height = img.height || 400;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      if (filterMode === 'ela') {
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        const multiplier = (elaIntensity / 10);
+        if (filterMode === 'ela') {
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+          const multiplier = (elaIntensity / 10);
 
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-          const diff = Math.abs(r - g) * 0.5 + Math.abs(g - b) * 0.5;
-          const enhanced = Math.min(255, diff * multiplier * 4);
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            const diff = Math.abs(r - g) * 0.5 + Math.abs(g - b) * 0.5;
+            const enhanced = Math.min(255, diff * multiplier * 4);
 
-          data[i] = enhanced * 1.2;
-          data[i + 1] = enhanced * 0.8;
-          data[i + 2] = enhanced * 2.0;
+            data[i] = enhanced * 1.2;
+            data[i + 1] = enhanced * 0.8;
+            data[i + 2] = enhanced * 2.0;
+          }
+          ctx.putImageData(imageData, 0, 0);
+        } else if (filterMode === 'noise') {
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+          for (let i = 0; i < data.length; i += 4) {
+            const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+            const highPass = (avg % 16) * 16;
+            data[i] = highPass;
+            data[i + 1] = highPass;
+            data[i + 2] = highPass;
+          }
+          ctx.putImageData(imageData, 0, 0);
         }
-        ctx.putImageData(imageData, 0, 0);
-      } else if (filterMode === 'noise') {
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        for (let i = 0; i < data.length; i += 4) {
-          const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-          const highPass = (avg % 16) * 16;
-          data[i] = highPass;
-          data[i + 1] = highPass;
-          data[i + 2] = highPass;
-        }
-        ctx.putImageData(imageData, 0, 0);
+      } catch (canvasErr) {
+        console.warn('Canvas ELA processing safely bypassed:', canvasErr.message);
       }
+    };
+    img.onerror = () => {
+      console.warn('Image could not be loaded for ELA analysis');
     };
   }, [report, filterMode, elaIntensity, activeTab]);
 

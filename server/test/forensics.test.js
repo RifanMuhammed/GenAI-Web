@@ -238,8 +238,8 @@ async function runAllTests() {
       };
       if (!origin) callback(null, true);
       else if (ALLOWED_ORIGINS.includes(origin)) callback(null, true);
-      else if (/^https:\/\/([a-zA-Z0-9_-]+-)?gen-ai-web(-[a-zA-Z0-9_-]+)?\.vercel\.app$/.test(origin) ||
-               /^https:\/\/.*-rifanmuhammed.*\.vercel\.app$/.test(origin)) {
+      else if (/^https:\/\/([a-zA-Z0-9_-]+\.)*vercel\.app$/.test(origin) ||
+               /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
         callback(null, true);
       } else {
         callback(new Error('CORS policy: Access denied for this origin.'), false);
@@ -248,11 +248,13 @@ async function runAllTests() {
     };
 
     assert.strictEqual(checkOrigin('https://gen-ai-web-45it.vercel.app').allowed, true, 'Production origin must be allowed');
+    assert.strictEqual(checkOrigin('https://gen-ai-cye3q16rf-rif8.vercel.app').allowed, true, 'Vercel deployment domain must be allowed');
     assert.strictEqual(checkOrigin('https://gen-ai-web-git-main-rifanmuhammed.vercel.app').allowed, true, 'Vercel preview branch must be allowed');
     assert.strictEqual(checkOrigin('http://localhost:5173').allowed, true, 'Localhost dev server must be allowed');
     assert.strictEqual(checkOrigin(null).allowed, true, 'Server-to-server requests without origin must be allowed');
     assert.strictEqual(checkOrigin('https://malicious-phishing-site.com').allowed, false, 'Unauthorized origin must be rejected');
     assert.strictEqual(checkOrigin('https://evil-gen-ai-web.com').allowed, false, 'Spoofed domain must be rejected');
+    assert.strictEqual(checkOrigin('https://fake-vercel.app.attacker.com').allowed, false, 'Subdomain attack must be rejected');
   });
 
   // 11. Client IP Resolution & Spoofing Defense
