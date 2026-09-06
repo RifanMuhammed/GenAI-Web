@@ -19,8 +19,10 @@ const {
   sanitizeClaimText, 
   sanitizeFilename,
   safeFetchMedia,
+  detectMimeTypeFromBuffer,
   createRateLimiter,
   maskError,
+  ALLOWED_MIME_TYPES,
   MAX_FILE_SIZE_BYTES 
 } = require('./security');
 
@@ -45,7 +47,7 @@ app.use((req, res, next) => {
   res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' http://localhost:* ws://localhost:* https://*.vercel.app https://*.googleapis.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' http://localhost:* ws://localhost:* https://*.vercel.app https://*.googleapis.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
   );
   // Prevent caching of sensitive analysis API responses
   if (req.path.startsWith('/api/')) {
@@ -222,13 +224,30 @@ app.use('/api/', generalApiLimiter);
 
 // --- API Routes ---
 
-// Health & System Info
+// Health & System Diagnostic Info
 app.get('/api/health', (req, res) => {
+  const hasGeminiKey = Boolean(process.env.GEMINI_API_KEY);
+  const hasRedis = Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+  const isProd = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
+
   res.json({
     status: 'online',
     version: '2.0.0',
     platform: 'ProofLens Forensic Intelligence Hub',
     timestamp: new Date().toISOString(),
+    environment: isProd ? 'production' : (process.env.NODE_ENV || 'development'),
+    services: {
+      rateLimiter: {
+        driver: hasRedis 
+          ? 'Upstash Redis (Distributed Cloud)' 
+          : (isProd ? 'Missing Config (Requires UPSTASH_REDIS_REST_URL)' : 'In-Memory Sliding-Window Token Bucket (Local Dev/Test)'),
+        status: hasRedis || !isProd ? 'healthy' : 'unconfigured_for_production'
+      },
+      aiForensicEngine: {
+        driver: hasGeminiKey ? 'Google Gemini Vision & Multimodal Pipeline' : 'Local Pixel & Signal Processing Forensic Engine',
+        status: 'ready'
+      }
+    },
     standards: ['C2PA-v1.3', 'IEEE-1857-Forensics', 'WCAG-2.1-AA'],
     engines: [
       'ImageDiffusionForensics', 
@@ -259,24 +278,20 @@ function buildUnifiedReport(baseAnalysis, filename, url, buffer = null) {
   const provenance = lookupProvenance({ title: safeName, type: mediaType, authenticityScore });
   const explainer = generateExplanation({ mediaType, authenticityScore, forensicMetrics, redFlags, detectedGenerator });
 
-  // Generate authentic SHA-256 digest
-  let sha256;
-  if (buffer && Buffer.isBuffer(buffer)) {
-    sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
-  } else {
-    sha256 = crypto.createHash('sha256').update(safeName + (url || '') + Date.now()).digest('hex');
-  }
-
-  const c2paId = 'C2PA-MAN-' + sha256.slice(0, 8).toUpperCase();
+  const hasMediaBuffer = buffer && Buffer.isBuffer(buffer);
+  const mediaSha256 = hasMediaBuffer ? crypto.createHash('sha256').update(buffer).digest('hex') : null;
+  const reportUniqueId = 'proof-' + Date.now().toString(36) + '-' + crypto.randomBytes(4).toString('hex');
+  const reportDigest = crypto.createHash('sha256').update(reportUniqueId + safeName + (url || '')).digest('hex');
 
   return {
-    id: 'proof-' + Date.now().toString(36),
+    id: reportUniqueId,
     timestamp: new Date().toISOString(),
     filename: safeName,
     sourceUrl: sanitizeUrl(url),
     mediaPreview: url ? sanitizeUrl(url) : null,
-    sha256,
-    c2paId,
+    mediaSha256,
+    sha256: mediaSha256 || reportDigest,
+    c2paId: null, // No synthetic C2PA ID generated unless hardware manifest is physically present
     ...baseAnalysis,
     provenance,
     citizenSummary: baseAnalysis.citizenSummary || explainer.citizenSummary,
@@ -405,16 +420,36 @@ app.post('/api/analyze/url', urlAnalysisLimiter, async (req, res) => {
       return res.status(400).json({ error: fetchErr.message || 'Unable to safely fetch remote media.' });
     }
 
-    const { buffer, mimeType, finalUrl } = fetched;
-    const type = req.body.type || (mimeType.startsWith('video') ? 'video' : mimeType.startsWith('audio') ? 'audio' : 'image');
+    const { buffer, finalUrl } = fetched;
 
+    // Validate downloaded buffer using magic-byte binary signature inspection
+    const detectedMime = detectMimeTypeFromBuffer(buffer);
+    if (!detectedMime) {
+      return res.status(400).json({
+        error: 'Remote media signature validation failed. Downloaded content is not a supported media format (JPEG, PNG, WebP, GIF, MP3, WAV, OGG, MP4, WebM, MOV).'
+      });
+    }
+
+    const allAllowedMimes = [
+      ...ALLOWED_MIME_TYPES.image,
+      ...ALLOWED_MIME_TYPES.audio,
+      ...ALLOWED_MIME_TYPES.video
+    ];
+
+    if (!allAllowedMimes.includes(detectedMime)) {
+      return res.status(400).json({
+        error: `Unsupported media format (${detectedMime}). Only standard image, audio, and video formats are supported.`
+      });
+    }
+
+    // Engine routing is strictly determined by validated magic-byte MIME type
     let analysis;
-    if (type === 'audio' || mimeType.startsWith('audio')) {
-      analysis = analyzeAudio({ fileBuffer: buffer, url: finalUrl });
-    } else if (type === 'video' || mimeType.startsWith('video')) {
-      analysis = await analyzeVideo({ fileBuffer: buffer, mimeType, url: finalUrl });
+    if (ALLOWED_MIME_TYPES.audio.includes(detectedMime)) {
+      analysis = analyzeAudio({ fileBuffer: buffer, mimeType: detectedMime, url: finalUrl });
+    } else if (ALLOWED_MIME_TYPES.video.includes(detectedMime)) {
+      analysis = await analyzeVideo({ fileBuffer: buffer, mimeType: detectedMime, url: finalUrl });
     } else {
-      analysis = await analyzeImage({ fileBuffer: buffer, mimeType, url: finalUrl });
+      analysis = await analyzeImage({ fileBuffer: buffer, mimeType: detectedMime, url: finalUrl });
     }
 
     const report = buildUnifiedReport(analysis, null, finalUrl, buffer);
@@ -447,18 +482,21 @@ app.post('/api/verify/live-frame', liveShieldLimiter, (req, res) => {
   try {
     const { hasFace = true, motionJitter = 0.1 } = req.body;
     const safeJitter = Math.min(1.0, Math.max(0.0, Number(motionJitter) || 0.1));
-    const anomalyScore = Math.min(100, Math.max(2, Math.round(safeJitter * 80 + Math.random() * 15)));
+    const anomalyScore = Math.min(100, Math.max(2, Math.round(safeJitter * 85)));
     const isDeepfake = anomalyScore > 65;
 
     res.json({
       timestamp: Date.now(),
+      isSimulation: true,
+      analysisMode: 'Client-Heuristic Telemetry Simulation (Demo)',
       anomalyScore,
       isDeepfake,
       faceDetected: Boolean(hasFace),
       landmarkConsistency: isDeepfake ? 42.1 : 97.6,
       blinkRatePerMinute: isDeepfake ? 3.2 : 18.4,
       lipSyncDelayMs: isDeepfake ? 110 : 8,
-      statusText: isDeepfake ? '⚠️ SYNTHETIC FACE ANOMALY DETECTED' : '🛡️ REAL HUMAN STREAM VERIFIED'
+      statusText: isDeepfake ? '⚠️ SIMULATED ANOMALY FLAGGED (Demo)' : '🛡️ STREAM NOMINAL (Simulated Stream Check)',
+      disclaimer: 'Live Shield real-time telemetry operates as a client-side demonstration simulation.'
     });
   } catch (err) {
     const masked = maskError(err, 'Live Frame Route');

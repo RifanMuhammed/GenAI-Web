@@ -1,5 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { validateFactCheckSource } = require('../security');
+const { validateFactCheckSource, verifyFactCheckArticle } = require('../security');
 
 // Local Fallback Claim Verifier (Honest heuristics without fabricating third-party fact-checker reports)
 function verifyClaimFallback({ claimText, geminiError = null }) {
@@ -45,9 +45,9 @@ function verifyClaimFallback({ claimText, geminiError = null }) {
       'Documented across accredited news agencies and historical archives.'
     ],
     provenance: {
-      reverseMatches: isSynthetic ? 1420 : 38,
+      reverseMatches: null, // No reverse image matches for text claims
       earliestAppearance: isSynthetic ? 'Viral Social Media Feed / Unverified Thread' : 'Official Press Wire & Archives',
-      c2paManifestFound: !isSynthetic,
+      c2paManifestFound: false, // Text claims do not have C2PA hardware manifests
       trustIndex: authenticityScore,
       socialSpreadRisk: isSynthetic ? 'HIGH_MISINFORMATION_RISK' : 'VERIFIED_SAFE_TO_CITE',
       factCheckSources: [] // Honest empty list: never fabricates third-party fact-checkers without verification
@@ -146,11 +146,20 @@ Respond with STRICT JSON ONLY. Do not wrap in markdown or backticks:
         const authenticityScore = Math.min(100, Math.max(0, Math.round(parsed.authenticityScore || 50)));
         const isSynthetic = authenticityScore < 50;
 
-        // Server-Side Strict Fact-Check Source Verification (Reject hallucinations & unaccredited URLs)
+        // Server-Side Strict Fact-Check Source Verification (Reject hallucinations & perform live verification where possible)
         const validatedSources = [];
         if (Array.isArray(parsed.factCheckSources)) {
           for (const rawSrc of parsed.factCheckSources) {
-            const verified = validateFactCheckSource(rawSrc);
+            let serverVerificationResult = null;
+            if (rawSrc && rawSrc.url) {
+              try {
+                const liveCheck = await verifyFactCheckArticle(rawSrc.url, sanitizedInput);
+                if (liveCheck && liveCheck.isVerified) {
+                  serverVerificationResult = liveCheck;
+                }
+              } catch {}
+            }
+            const verified = validateFactCheckSource(rawSrc, serverVerificationResult);
             if (verified) {
               validatedSources.push(verified);
             }
@@ -172,9 +181,9 @@ Respond with STRICT JSON ONLY. Do not wrap in markdown or backticks:
           sharingGuidance: parsed.sharingGuidance || (isSynthetic ? '🚫 DO NOT SHARE: False or uncorroborated claim.' : '✅ SAFE TO SHARE: Verified fact.'),
           redFlags: Array.isArray(parsed.keyFacts) ? parsed.keyFacts.map(k => String(k).slice(0, 200)) : [],
           provenance: {
-            reverseMatches: isSynthetic ? 1840 : 42,
+            reverseMatches: null, // No reverse image matches for text claims
             earliestAppearance: isSynthetic ? 'Viral Disinformation Stream' : 'Accredited News & Historical Wire',
-            c2paManifestFound: !isSynthetic,
+            c2paManifestFound: false, // Text claims do not have C2PA hardware manifests
             trustIndex: authenticityScore,
             socialSpreadRisk: isSynthetic ? 'HIGH_MISINFORMATION_RISK' : 'VERIFIED_SAFE_TO_CITE',
             factCheckSources: validatedSources

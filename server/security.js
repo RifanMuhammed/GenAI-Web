@@ -25,11 +25,20 @@ const ALLOWED_EXTENSIONS = {
 // --- 1. IP & SSRF Defense Utilities ---
 
 /**
- * Checks if an IPv4 address string (in standard dotted format) is private or internal.
+ * Checks if an IPv4 address string (in standard dotted format, octal, or hex) is private or internal.
  */
 function isPrivateIPv4(ip) {
-  const parts = ip.split('.').map(n => parseInt(n, 10));
-  if (parts.length !== 4 || parts.some(isNaN)) return true; // Invalid format treated as unsafe
+  if (!ip || typeof ip !== 'string') return true;
+  const rawParts = ip.trim().split('.');
+  if (rawParts.length !== 4) return true;
+
+  const parts = rawParts.map(p => {
+    p = p.trim();
+    if (p.startsWith('0x') || p.startsWith('0X')) return parseInt(p, 16);
+    if (p.length > 1 && p.startsWith('0')) return parseInt(p, 8);
+    return parseInt(p, 10);
+  });
+  if (parts.some(isNaN) || parts.some(n => n < 0 || n > 255)) return true;
 
   const [b0, b1, b2, b3] = parts;
 
@@ -66,34 +75,62 @@ function isPrivateIPv4(ip) {
 }
 
 /**
- * Checks if an IPv6 address is private, loopback, link-local, or IPv4-mapped private.
+ * Checks if an IPv6 address is private, loopback, link-local, documentation, or IPv4-mapped private.
  */
 function isPrivateIPv6(ip) {
+  if (!ip || typeof ip !== 'string') return true;
   const normalized = ip.toLowerCase().trim();
 
-  // Loopback and unspecified
-  if (normalized === '::1' || normalized === '::') return true;
+  // Loopback, unspecified, and ::ffff:0:0/96
+  if (normalized === '::1' || normalized === '::' || normalized === '0:0:0:0:0:0:0:1' || normalized === '0:0:0:0:0:0:0:0') return true;
 
-  // IPv4-mapped IPv6 (::ffff:127.0.0.1 or ::ffff:7f00:1)
-  if (normalized.startsWith('::ffff:')) {
-    const rawIpv4 = normalized.replace('::ffff:', '');
-    if (net.isIPv4(rawIpv4)) {
-      return isPrivateIPv4(rawIpv4);
+  // IPv4-mapped IPv6 (::ffff:127.0.0.1 or ::ffff:7f00:1 or ::ffff:192.168.1.1)
+  if (normalized.includes('::ffff:')) {
+    const rawIpv4 = normalized.split('::ffff:')[1];
+    if (rawIpv4) {
+      if (net.isIPv4(rawIpv4) || rawIpv4.includes('.')) {
+        return isPrivateIPv4(rawIpv4);
+      }
+      // Dotted hex or 32-bit hex in IPv6 (e.g. 7f00:1)
+      const hexParts = rawIpv4.split(':');
+      if (hexParts.length <= 2) {
+        try {
+          const num = parseInt(hexParts.join(''), 16);
+          if (!isNaN(num)) {
+            const b0 = (num >>> 24) & 255;
+            const b1 = (num >>> 16) & 255;
+            const b2 = (num >>> 8) & 255;
+            const b3 = num & 255;
+            return isPrivateIPv4(`${b0}.${b1}.${b2}.${b3}`);
+          }
+        } catch {}
+      }
     }
+    return true;
   }
 
-  // Link-Local (fe80::/10)
+  // Link-Local (fe80::/10 -> fe8, fe9, fea, feb)
   if (normalized.startsWith('fe8') || normalized.startsWith('fe9') || normalized.startsWith('fea') || normalized.startsWith('feb')) {
     return true;
   }
 
-  // Unique Local Address (fc00::/7 -> fc00:: to fdff::)
+  // Unique Local Address (fc00::/7 -> fc, fd)
   if (normalized.startsWith('fc') || normalized.startsWith('fd')) {
     return true;
   }
 
   // Multicast (ff00::/8)
   if (normalized.startsWith('ff')) {
+    return true;
+  }
+
+  // Documentation / Example prefix (2001:db8::/32)
+  if (normalized.startsWith('2001:db8') || normalized.startsWith('2001:0db8')) {
+    return true;
+  }
+
+  // Discard Prefix (100::/64)
+  if (normalized.startsWith('100::') || normalized.startsWith('0100::')) {
     return true;
   }
 
@@ -105,15 +142,20 @@ function isPrivateIPv6(ip) {
  */
 function isPrivateOrInternalIP(ipStr) {
   if (!ipStr || typeof ipStr !== 'string') return false;
-  const trimmed = ipStr.trim();
+  let trimmed = ipStr.trim();
+  
+  // Strip enclosing brackets if IPv6 literal e.g. [::1]
+  if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+    trimmed = trimmed.slice(1, -1);
+  }
 
   // Check standard IPv4
-  if (net.isIPv4(trimmed)) {
+  if (net.isIPv4(trimmed) || (trimmed.includes('.') && trimmed.split('.').length === 4)) {
     return isPrivateIPv4(trimmed);
   }
 
   // Check standard IPv6
-  if (net.isIPv6(trimmed)) {
+  if (net.isIPv6(trimmed) || trimmed.includes(':')) {
     return isPrivateIPv6(trimmed);
   }
 
@@ -487,41 +529,93 @@ function sanitizeClaimText(text, maxLength = 500) {
 
 function sanitizeFilename(name, maxLength = 180) {
   if (!name || typeof name !== 'string') return 'media-target';
+  let decoded = name;
+  try {
+    decoded = decodeURIComponent(name);
+  } catch {}
+
   // Strip path traversal sequences, slashes, and control characters
-  const clean = name
-    .replace(/^.*[\\\/]/, '') // Strip full path
+  let clean = decoded
+    .replace(/^.*[\\\/]/, '') // Strip leading path
     .replace(/(\.\.[\/\\])+/g, '') // Strip traversal
+    .replace(/\.\.+/g, '') // Strip multiple dots
     .replace(/[^a-zA-Z0-9._\- ]/g, '_')
+    .replace(/^_+/, '')
     .trim()
     .slice(0, maxLength);
+
   return clean || 'media-target';
 }
 
 // --- 4. Client IP Resolution & Distributed Rate Limiter ---
 
 /**
- * Resolves trusted client IP in Vercel serverless or standard proxy environments.
+ * Normalizes IPv4 and IPv6 strings (e.g. ::ffff:192.0.2.1 -> 192.0.2.1).
  */
-function getTrustedClientIp(req) {
-  if (!req) return '127.0.0.1';
-  // 1. Vercel serverless trusted header
-  if (req.headers && req.headers['x-vercel-forwarded-for']) {
-    return req.headers['x-vercel-forwarded-for'].split(',')[0].trim();
+function normalizeIp(ipStr) {
+  if (!ipStr || typeof ipStr !== 'string') return '127.0.0.1';
+  let cleaned = ipStr.trim();
+  if (cleaned.startsWith('::ffff:')) {
+    cleaned = cleaned.slice(7);
   }
-  // 2. Real-IP header (e.g. NGINX / Cloudflare)
-  if (req.headers && req.headers['x-real-ip']) {
-    return req.headers['x-real-ip'].trim();
+  if (net.isIP(cleaned)) {
+    return cleaned;
   }
-  // 3. Standard X-Forwarded-For (leftmost IP)
-  if (req.headers && req.headers['x-forwarded-for']) {
-    return req.headers['x-forwarded-for'].split(',')[0].trim();
-  }
-  // 4. Direct socket connection fallback
-  return req.socket?.remoteAddress || req.connection?.remoteAddress || '127.0.0.1';
+  return '127.0.0.1';
 }
 
 /**
- * Multi-Tiered Rate Limiter supporting Upstash Redis REST (Serverless) + Memory Token Bucket Fallback.
+ * Resolves trusted client IP in Vercel serverless or standard proxy environments.
+ * Prioritizes platform-injected edge headers (x-vercel-forwarded-for) and normalizes IPv4/IPv6.
+ */
+function getTrustedClientIp(req) {
+  if (!req) return '127.0.0.1';
+
+  const headers = req.headers || {};
+  
+  // Platform / deployment trust boundary ONLY from server environment (never inferred from client headers)
+  const isVercel = Boolean(process.env.VERCEL) || Boolean(process.env.VERCEL_ENV);
+  const isTrustedProxy = isVercel || process.env.TRUSTED_PROXY === 'true';
+
+  // 1. If running on Vercel platform, platform-injected edge header is authoritative
+  if (isVercel) {
+    if (headers['x-vercel-forwarded-for']) {
+      const firstIp = headers['x-vercel-forwarded-for'].split(',')[0].trim();
+      if (firstIp) return normalizeIp(firstIp);
+    }
+    if (headers['x-real-ip']) {
+      return normalizeIp(headers['x-real-ip']);
+    }
+    if (headers['x-forwarded-for']) {
+      const leftmost = headers['x-forwarded-for'].split(',')[0].trim();
+      if (leftmost) return normalizeIp(leftmost);
+    }
+  }
+
+  // 2. If running behind an explicitly configured trusted reverse proxy (TRUSTED_PROXY=true)
+  if (isTrustedProxy) {
+    if (headers['x-real-ip']) {
+      return normalizeIp(headers['x-real-ip']);
+    }
+    if (headers['x-forwarded-for']) {
+      const leftmost = headers['x-forwarded-for'].split(',')[0].trim();
+      if (leftmost) return normalizeIp(leftmost);
+    }
+  }
+
+  // 3. Direct Node.js / Localhost / Test connections without trusted proxy configuration:
+  // Forwarded headers MUST NEVER be trusted to establish client identity or bypass rate limiting.
+  const socketAddr = req.socket?.remoteAddress || req.connection?.remoteAddress || (typeof req.ip === 'string' ? req.ip : null);
+  if (socketAddr) {
+    return normalizeIp(socketAddr);
+  }
+
+  return '127.0.0.1';
+}
+
+/**
+ * Distributed Rate Limiter with Upstash Redis REST enforcement for Production / Vercel
+ * and an in-memory sliding-window token bucket for development / test environments only.
  */
 function createRateLimiter({ windowMs = 60000, maxRequests = 30, message = 'Rate limit exceeded. Please wait a moment before trying again.' }) {
   const ipHits = new Map();
@@ -529,22 +623,35 @@ function createRateLimiter({ windowMs = 60000, maxRequests = 30, message = 'Rate
   const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
   const hasDistributedRedis = Boolean(redisUrl && redisToken);
 
-  // Periodic in-memory garbage collection
-  setInterval(() => {
-    const now = Date.now();
-    for (const [ip, data] of ipHits.entries()) {
-      if (now - data.resetTime > windowMs) {
-        ipHits.delete(ip);
+  // Distinguish production deployment vs development/test
+  const isProduction = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL) || process.env.VERCEL_ENV === 'production';
+  const isTestOrDev = process.env.NODE_ENV === 'test' || (!isProduction && process.env.NODE_ENV !== 'production');
+
+  // Periodic in-memory garbage collection for dev/test fallback
+  if (isTestOrDev) {
+    setInterval(() => {
+      const now = Date.now();
+      for (const [ip, data] of ipHits.entries()) {
+        if (now - data.resetTime > windowMs) {
+          ipHits.delete(ip);
+        }
       }
-    }
-  }, 180000).unref();
+    }, 180000).unref();
+  }
 
   return async (req, res, next) => {
     const ip = getTrustedClientIp(req);
     const now = Date.now();
 
-    // 1. Distributed Upstash Redis Rate Limiter if configured (Vercel Serverless)
-    if (hasDistributedRedis) {
+    // 1. Production / Vercel Environment MUST enforce Upstash Redis (No silent in-memory fallback)
+    if (isProduction && !isTestOrDev) {
+      if (!hasDistributedRedis) {
+        console.error('[RateLimiter Configuration Error] UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required in production.');
+        return res.status(503).json({
+          error: 'Rate limiting service is not properly configured for production. UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required.'
+        });
+      }
+
       try {
         const key = `ratelimit:${ip}:${Math.floor(now / windowMs)}`;
         const expireSeconds = Math.ceil(windowMs / 1000) * 2;
@@ -572,13 +679,21 @@ function createRateLimiter({ windowMs = 60000, maxRequests = 30, message = 'Rate
             });
           }
           return next();
+        } else {
+          console.error(`[RateLimiter Error] Upstash Redis returned HTTP ${response.status}`);
+          return res.status(503).json({
+            error: 'Rate limiting service temporarily unavailable. Please try again shortly.'
+          });
         }
       } catch (redisErr) {
-        // Non-fatal: fallback seamlessly to in-memory rate limiter
+        console.error('[RateLimiter Error] Upstash Redis connection failed:', redisErr.message);
+        return res.status(503).json({
+          error: 'Rate limiting service temporarily unavailable. Please try again shortly.'
+        });
       }
     }
 
-    // 2. Sliding-Window In-Memory Token Bucket Fallback
+    // 2. Development & Test Fallback: In-Memory Sliding-Window Token Bucket
     let record = ipHits.get(ip);
     if (!record || now > record.resetTime) {
       record = { count: 1, resetTime: now + windowMs };
@@ -645,10 +760,128 @@ const ACCREDITED_ORGANIZATION_NAMES = [
   'new york times'
 ];
 
-function validateFactCheckSource(source) {
+/**
+ * Live Fact-Check Article Verifier
+ * Safely fetches remote article via SSRF-shielded HTTP/HTTPS client,
+ * confirms HTTP 200, checks text/html MIME type, extracts title/meta description,
+ * and checks relevance against the analyzed claim.
+ */
+async function verifyFactCheckArticle(rawUrl, claimText = '') {
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    return {
+      isVerified: false,
+      status: 'AI_SUGGESTED_CANDIDATE',
+      verificationNote: 'AI-suggested source — not independently verified'
+    };
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(rawUrl.trim());
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return {
+        isVerified: false,
+        status: 'AI_SUGGESTED_CANDIDATE',
+        verificationNote: 'AI-suggested source — not independently verified'
+      };
+    }
+  } catch {
+    return {
+      isVerified: false,
+      status: 'AI_SUGGESTED_CANDIDATE',
+      verificationNote: 'AI-suggested source — not independently verified'
+    };
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+  const isAccreditedDomain = ACCREDITED_FACT_CHECK_DOMAINS.some(domain =>
+    hostname === domain || hostname.endsWith('.' + domain)
+  );
+
+  if (!isAccreditedDomain) {
+    return {
+      isVerified: false,
+      status: 'UNVERIFIED_DOMAIN',
+      verificationNote: 'AI-suggested source — not independently verified'
+    };
+  }
+
+  try {
+    const fetched = await safeFetchMedia(parsed.toString(), 2 * 1024 * 1024);
+    if (!fetched || !fetched.buffer) {
+      return {
+        isVerified: false,
+        status: 'AI_SUGGESTED_CANDIDATE',
+        verificationNote: 'AI-suggested source — not independently verified'
+      };
+    }
+
+    const htmlSnippet = fetched.buffer.slice(0, 100000).toString('utf-8');
+    const isHtml = (fetched.mimeType && fetched.mimeType.includes('text/html')) ||
+                   /<html|<!doctype html|<body|<title/i.test(htmlSnippet);
+
+    if (!isHtml) {
+      return {
+        isVerified: false,
+        status: 'AI_SUGGESTED_CANDIDATE',
+        verificationNote: 'AI-suggested source — not independently verified'
+      };
+    }
+
+    let articleTitle = null;
+    let metaDescription = null;
+
+    const titleMatch = htmlSnippet.match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (titleMatch && titleMatch[1]) {
+      articleTitle = sanitizeClaimText(titleMatch[1].replace(/\s+/g, ' '), 200);
+    }
+
+    const metaMatch = htmlSnippet.match(/<meta[^>]+(?:name|property)=["'](?:description|og:description|og:title)["'][^>]+content=["']([^"']+)["']/i);
+    if (metaMatch && metaMatch[1]) {
+      metaDescription = sanitizeClaimText(metaMatch[1].replace(/\s+/g, ' '), 300);
+    }
+
+    let hasTopicRelevance = true;
+    if (claimText && typeof claimText === 'string' && claimText.trim().length > 0) {
+      const claimWords = claimText.toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 3 && !['this', 'that', 'with', 'from', 'have', 'were', 'what', 'when', 'where', 'image', 'photo', 'video', 'news'].includes(w));
+
+      if (claimWords.length > 0) {
+        const combinedText = `${articleTitle || ''} ${metaDescription || ''} ${htmlSnippet.slice(0, 5000)}`.toLowerCase();
+        const matchingWordCount = claimWords.filter(w => combinedText.includes(w)).length;
+        hasTopicRelevance = matchingWordCount >= 1;
+      }
+    }
+
+    if (articleTitle && hasTopicRelevance) {
+      return {
+        isVerified: true,
+        status: 'INDEPENDENTLY_VERIFIED',
+        articleTitle,
+        metaDescription,
+        verificationNote: `Independently verified published report: "${articleTitle}"`
+      };
+    }
+
+    return {
+      isVerified: false,
+      status: 'AI_SUGGESTED_CANDIDATE',
+      verificationNote: 'AI-suggested source — not independently verified'
+    };
+  } catch (fetchErr) {
+    return {
+      isVerified: false,
+      status: 'AI_SUGGESTED_CANDIDATE',
+      verificationNote: 'AI-suggested source — not independently verified'
+    };
+  }
+}
+
+function validateFactCheckSource(source, serverVerification = null) {
   if (!source || typeof source !== 'object') return null;
   const name = sanitizeClaimText(source.name || '', 100);
-  const status = sanitizeClaimText(source.status || 'UNVERIFIED', 50);
   const claim = sanitizeClaimText(source.claim || '', 300);
   const rawUrl = source.url && typeof source.url === 'string' ? source.url.trim() : null;
 
@@ -685,21 +918,105 @@ function validateFactCheckSource(source) {
     return null;
   }
 
+  // Curated benchmark reference cases
+  const isKnownBenchmark = Boolean(source.isBenchmark);
+
+  let status = 'AI_SUGGESTED_CANDIDATE';
+  let isIndependentlyVerified = false;
+  let verifiedTitle = null;
+  let verificationNote = 'AI-suggested source — not independently verified';
+
+  if (isKnownBenchmark) {
+    status = sanitizeClaimText(source.status || 'BENCHMARK_REFERENCE', 50);
+    verificationNote = 'Benchmark reference evidence (historical incident documentation).';
+  } else if (
+    serverVerification &&
+    typeof serverVerification === 'object' &&
+    serverVerification.isVerified === true &&
+    typeof serverVerification.articleTitle === 'string' &&
+    serverVerification.articleTitle.trim().length > 0
+  ) {
+    // ONLY server-side verification from verifyFactCheckArticle() establishes INDEPENDENTLY_VERIFIED
+    // Never trust model/Gemini output fields (isIndependentlyVerified, verifiedTitle, status)
+    status = 'INDEPENDENTLY_VERIFIED';
+    isIndependentlyVerified = true;
+    verifiedTitle = sanitizeClaimText(serverVerification.articleTitle, 200);
+    verificationNote = `Independently verified published report: "${verifiedTitle}"`;
+  } else {
+    // If live verification was not performed or failed
+    status = 'AI_SUGGESTED_CANDIDATE';
+    isIndependentlyVerified = false;
+    verifiedTitle = null;
+    verificationNote = 'AI-suggested source — not independently verified';
+  }
+
   return {
     name,
     status,
     claim: claim || 'Documented report cataloged in public registry.',
     url: verifiedUrl,
-    isVerifiedDomain: Boolean(verifiedUrl)
+    isVerifiedDomain: Boolean(verifiedUrl),
+    isBenchmark: Boolean(isKnownBenchmark),
+    isIndependentlyVerified,
+    verifiedTitle,
+    verificationNote
   };
 }
 
 // --- 6. Error Masking Utility ---
 
+/**
+ * Sanitizes and redacts sensitive patterns (passwords, tokens, API keys, secrets)
+ * from server diagnostic logs to prevent secret leakage into production log streams.
+ */
+function redactSensitiveLog(text) {
+  if (!text || typeof text !== 'string') return '';
+  let sanitized = text;
+
+  // Redact known active environment secrets if present
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 5) {
+    sanitized = sanitized.split(process.env.GEMINI_API_KEY).join('[REDACTED_GEMINI_KEY]');
+  }
+  if (process.env.UPSTASH_REDIS_REST_TOKEN && process.env.UPSTASH_REDIS_REST_TOKEN.length > 5) {
+    sanitized = sanitized.split(process.env.UPSTASH_REDIS_REST_TOKEN).join('[REDACTED_REDIS_TOKEN]');
+  }
+
+  // Redact Google / Gemini API key signature (AIzaSy...)
+  sanitized = sanitized.replace(/AIzaSy[a-zA-Z0-9_-]{10,}/g, '[REDACTED_API_KEY]');
+
+  // Redact credentials (passwords, secrets, tokens, api keys) with := or space separators
+  sanitized = sanitized.replace(
+    /((?:api[_-]?key|apikey|secret|password|passwd|pwd|access[_-]?token|refresh[_-]?token|auth[_-]?token|token)\s*[:=\s]\s*['"]?)([^'"\s,;&]+)(['"]?)/gi,
+    '$1[REDACTED_SECRET]$3'
+  );
+
+  // Redact Bearer and Basic authorization headers/tokens
+  sanitized = sanitized.replace(
+    /(Authorization\s*[:=\s]\s*['"]?(?:Bearer|Basic)\s+)([^'"\s,;&]+)(['"]?)/gi,
+    '$1[REDACTED_TOKEN]$3'
+  );
+  sanitized = sanitized.replace(
+    /\b(?:Bearer|Basic)\s+([a-zA-Z0-9._~+/-]{10,}=*)/gi,
+    'Bearer [REDACTED_TOKEN]'
+  );
+
+  // Redact Cookie and Session values
+  sanitized = sanitized.replace(
+    /((?:cookie|session|set-cookie)\s*[:=\s]\s*['"]?)([^'"\r\n;]+)(['"]?)/gi,
+    '$1[REDACTED_COOKIE]$3'
+  );
+
+  return sanitized;
+}
+
 function maskError(err, context = 'Forensic Engine') {
   const correlationId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36);
-  // Log full diagnostic securely server-side only
-  console.error(`[Security Log] [${correlationId}] ${context} Error:`, err && (err.stack || err.message || err));
+  
+  // Extract and sanitize error details for safe server-side logging
+  const rawLog = err ? (err.stack || err.message || String(err)) : 'Unknown internal exception';
+  const redactedLog = redactSensitiveLog(rawLog);
+
+  console.error(`[Security Log] [${correlationId}] ${context} Error:`, redactedLog);
 
   return {
     error: 'An internal error occurred during analysis. Please check your media format and try again.',
@@ -718,7 +1035,9 @@ module.exports = {
   sanitizeFilename,
   getTrustedClientIp,
   createRateLimiter,
+  verifyFactCheckArticle,
   validateFactCheckSource,
+  redactSensitiveLog,
   maskError,
   ALLOWED_MIME_TYPES,
   ALLOWED_EXTENSIONS,

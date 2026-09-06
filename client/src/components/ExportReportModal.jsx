@@ -177,10 +177,10 @@ export default function ExportReportModal({ report, onClose }) {
                 </div>
                 <div>
                   <p className="font-bold text-slate-900 text-xs">
-                    {report.authenticityScore > 75 ? 'Hardware Signed' : 'Synthetic / Missing'}
+                    {report.c2paId ? 'Hardware Manifest Verified' : 'No Hardware Manifest'}
                   </p>
                   <p className="text-[11px] text-slate-600 mt-0.5 font-mono">
-                    ID: {report.c2paId || 'C2PA-MAN-84920'}
+                    {report.c2paId ? `ID: ${report.c2paId}` : 'Not Embedded in Media'}
                   </p>
                 </div>
               </div>
@@ -191,10 +191,10 @@ export default function ExportReportModal({ report, onClose }) {
             <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 flex-shrink-0">
                 <Fingerprint className="w-3.5 h-3.5 text-sky-600" />
-                <span>SHA-256 Fingerprint:</span>
+                <span>{report.mediaSha256 ? 'Media SHA-256 Digest:' : 'Report Hash Identifier:'}</span>
               </span>
               <span className="font-mono text-[10px] text-slate-700 bg-white px-2.5 py-1 rounded border border-slate-200 break-all">
-                {report.sha256 || '8a7f920bc4832e01dfa8246bc9e315082190f8423e20bb4184a2f8b03e218'}
+                {report.mediaSha256 || report.sha256 || '8a7f920bc4832e01dfa8246bc9e315082190f8423e20bb4184a2f8b03e218'}
               </span>
             </div>
 
@@ -249,9 +249,11 @@ export default function ExportReportModal({ report, onClose }) {
                     >
                       <span className="font-bold text-slate-950">{s.name}</span>
                       <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                        s.status.includes('SYNTHETIC') || s.status.includes('FALSE') || s.status.includes('DEBUNKED')
+                        s.status && (s.status.includes('SYNTHETIC') || s.status.includes('FALSE') || s.status.includes('DEBUNKED'))
                           ? 'bg-red-100 text-red-700 border border-red-200'
-                          : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          : (s.status && (s.status.includes('CANDIDATE') || s.status.includes('UNVERIFIED') || s.status.includes('SUGGESTED')))
+                            ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                            : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                       }`}>
                         {s.status}
                       </span>

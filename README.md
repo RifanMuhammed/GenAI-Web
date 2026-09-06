@@ -8,7 +8,7 @@
 <div align="center">
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel%20Deployment-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://gen-ai-web-45it.vercel.app/)
-[![Tests](https://img.shields.io/badge/Security%20Tests-17%2F17%20Passing%20(100%25)-emerald?style=for-the-badge&logo=jest&logoColor=white)](server/test/forensics.test.js)
+[![Tests](https://img.shields.io/badge/Security%20Tests-21%2F21%20Passing%20(100%25)-emerald?style=for-the-badge&logo=jest&logoColor=white)](server/test/forensics.test.js)
 [![AI Engine](https://img.shields.io/badge/AI%20Engine-Google%20Gemini%20Multimodal-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
 [![Security](https://img.shields.io/badge/Security-Enterprise%20SSRF%20%26%20Magic--Bytes-purple?style=for-the-badge&logo=auth0&logoColor=white)](server/security.js)
 [![Standard](https://img.shields.io/badge/Standard-C2PA%20v1.3%20%7C%20IEEE--1857-orange?style=for-the-badge)](https://c2pa.org/)
@@ -298,9 +298,13 @@ $ node server/test/forensics.test.js
   ✔ PASS Client IP Resolution: getTrustedClientIp prioritizes platform trusted headers
   ✔ PASS Fact-Checking Integrity: validateFactCheckSource filters unaccredited domains & SSRF URLs
   ✔ PASS Claim Verifier: Handles extremely long text and malicious injections gracefully
+  ✔ PASS API Key Isolation: Guarantees server key exclusivity and zero response leakage
+  ✔ PASS Filename Sanitization: Neutralizes encoded traversal and illegal symbols
+  ✔ PASS AI Output Schema: Validates score boundaries and structure
+  ✔ PASS Provenance Integrity: Distinguishes known benchmarks from uncataloged user uploads
 
 ------------------------------------------------------------
-  📊 Test Summary: 17/17 Passed (100%)
+  📊 Test Summary: 21/21 Passed (100%)
 ============================================================
 ```
 

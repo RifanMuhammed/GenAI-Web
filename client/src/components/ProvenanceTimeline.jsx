@@ -33,18 +33,29 @@ export default function ProvenanceTimeline({ provenance, report }) {
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
                 Reverse Search Matches
               </span>
-              <div className="text-2xl font-bold text-sky-400 font-display">
-                {data.reverseMatches?.toLocaleString() || 1240} <span className="text-xs font-normal text-slate-500">sightings</span>
+              <div className="text-xl sm:text-2xl font-bold text-sky-400 font-display">
+                {data.reverseMatches != null ? (
+                  <>
+                    {data.reverseMatches.toLocaleString()} <span className="text-xs font-normal text-slate-500">sightings</span>
+                  </>
+                ) : (
+                  <span className="text-sm font-medium text-slate-400">Not Indexed in Registries</span>
+                )}
               </div>
+              {data.isBenchmark && (
+                <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-sky-500/10 text-sky-300 border border-sky-500/30 mt-2 inline-block">
+                  Benchmark Evidence
+                </span>
+              )}
             </div>
 
             <div className="bg-slate-950 rounded-2xl p-4 border border-slate-800">
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                First Appearance
+                Earliest Indexed Appearance
               </span>
               <div className="flex items-center gap-2 text-xs font-semibold text-slate-300 mt-1">
-                <Calendar className="w-3.5 h-3.5 text-sky-400" />
-                <span>{data.firstSeen || data.earliestAppearance || 'March 24, 2023'}</span>
+                <Calendar className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
+                <span className="truncate">{data.firstSeen || data.earliestAppearance || 'No prior public registry record'}</span>
               </div>
             </div>
           </div>
@@ -70,7 +81,9 @@ export default function ProvenanceTimeline({ provenance, report }) {
                         <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${
                           src.status && (src.status.includes('SYNTHETIC') || src.status.includes('DEBUNKED') || src.status.includes('FALSE') || src.status.includes('FABRICATED'))
                             ? 'bg-red-500/15 text-red-300 border border-red-500/30'
-                            : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                            : (src.status && (src.status.includes('CANDIDATE') || src.status.includes('UNVERIFIED') || src.status.includes('SUGGESTED')))
+                              ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                              : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                         }`}>
                           {src.status || 'UNVERIFIED'}
                         </span>
@@ -78,6 +91,11 @@ export default function ProvenanceTimeline({ provenance, report }) {
                       <p className="text-slate-400 text-[11px] max-w-md">
                         {src.claim || 'Forensic lab corroboration confirms synthetic generation signatures.'}
                       </p>
+                      {src.verificationNote && (
+                        <p className="text-slate-500 text-[10px] italic">
+                          ℹ️ {src.verificationNote}
+                        </p>
+                      )}
                     </div>
 
                     {isSafeUrl && (
